@@ -86,15 +86,15 @@ end
 $user_mapping = {}
 repos =  github.repos.list(org: ORGANIZATION)
 issue_statuses =  IssueStatus.all
-puts 'Name of open issue status - (new)'
+puts 'Name of open issue status - (Backlog)'
 open_issue_status_name = gets.chomp
-open_issue_status_name = 'new' if open_issue_status_name == ''
+open_issue_status_name = 'Backlog' if open_issue_status_name == ''
 open_issue_status = issue_statuses.detect { |is| is.name.upcase == open_issue_status_name.upcase}
-puts 'Name of closed issue status - (closed)'
+puts 'Name of closed issue status - (Done)'
 closed_issue_status_name = gets.chomp
-closed_issue_status_name = 'closed' if closed_issue_status_name == ''
+closed_issue_status_name = 'Done' if closed_issue_status_name == ''
 closed_issue_status = issue_statuses.detect { |is| is.name.upcase == closed_issue_status_name.upcase}
-puts 'Name of normal priority - (default)'
+puts 'Name of normal priority - (normal)'
 normal_priority_name = gets.chomp
 normal_priority_name = 'normal' if normal_priority_name == ''
 normal_priority = IssuePriority.all.detect { |ip| ip.name.upcase == normal_priority_name.upcase }
