@@ -3,7 +3,7 @@ gem 'activeresource', '~> 3.2.12'
 require 'active_resource'
 require 'github_api'
 
-REDMINE_TOKEN = '5eba7164b4ce2944d0bdd3c34aa93049f1ccf2ea'
+REDMINE_TOKEN = ''
 REDMINE_SITE = 'http://0.0.0.0:3000'
 GITHUB_TOKEN = ''
 ORGANIZATION = 'paupaude'
@@ -14,6 +14,15 @@ class Issue < ActiveResource::Base
   self.site = REDMINE_SITE
   self.user = REDMINE_TOKEN
   self.password = 'nothing'
+  def impersonate(login)
+    @headers = { 'X-Redmine-Switch-User' => login }
+  end
+  def remove_impersonation
+    @headers = { }
+  end
+  def head
+    @headers
+  end
 end
 
 class Project < ActiveResource::Base
@@ -116,6 +125,7 @@ end
 
 tracker_names = $trackers.collect { |t| t.name }
 user_names = $users.collect { |u| u.login }
+project_names = $redmine_projects.collect { |p| p.name }
 
 repos.each do |repo|
   name = repo.name
@@ -125,6 +135,7 @@ repos.each do |repo|
   closed_issues = github.issues.list(user: ORGANIZATION, repo: name, state: 'closed')
   puts "#{closed_issues.size} closed issues"
   puts "Enter name of Redmine project - type 'skip' to skip - (#{name})"
+  puts "Available projects #{project_names}"
   redmine_project = gets.chomp
   redmine_project = name if redmine_project == ''
   if redmine_project == 'skip'
@@ -143,6 +154,7 @@ repos.each do |repo|
     else
       puts "Project exists"
     end
+    $redmine_projects = Project.all
 
     puts "Available trackers: #{tracker_names}"
     puts "Select tracker: - (bug)"
@@ -186,7 +198,7 @@ repos.each do |repo|
           set_user_mapping(e_login.upcase, login.upcase)
           user = get_user_mapping(login.upcase)
         end
-        i.author_id = user.id unless user.nil?
+        i.impersonate(user.login) unless user.nil?
       end
       if !oi.assignee.nil?
         login = oi.assignee.login
@@ -200,13 +212,12 @@ repos.each do |repo|
         end
         i.assigned_to_id = user.id unless user.nil?
       end
-
       if i.save!
         puts "issue saved"
       else
         puts "issue error #{i.errors.full_messages}"
       end
-
+      i.remove_impersonation
       if oi.comments > 0
         github.issues.comments.list(user: ORGANIZATION, repo: name, issue_id: oi.number).each do |comment|
           i.notes = comment.body
