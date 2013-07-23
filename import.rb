@@ -174,7 +174,7 @@ repos.each do |repo|
     open_issues.each do |oi|
       description_text = oi.body
       i = Issue.new project_id: project.id, status_id: open_issue_status.id, priority_id: normal_priority.id, subject: oi.title,
-                description: description_text.force_encoding('utf-8'), start_date: Time.parse(oi.created_at).to_date, tracker_id: tracker.id
+                description: description_text.force_encoding('utf-8'), start_date: Time.parse(oi.created_at).to_date.to_s, tracker_id: tracker.id
 
       versions = Version.find(:all, :params => {:project_id => project.id})
 
@@ -244,7 +244,7 @@ repos.each do |repo|
     closed_issues.each do |ci|
       description_text = ci.body
       i = Issue.new project_id: project.id, status_id: closed_issue_status.id, priority_id: normal_priority.id, subject: ci.title,
-                    description: description_text.force_encoding('utf-8'), start_date: Time.parse(ci.created_at).to_date, closed_on: Time.parse(ci.closed_at)
+                    description: description_text.force_encoding('utf-8'), start_date: Time.parse(ci.created_at).to_date.to_s, closed_on: Time.parse(ci.closed_at).to_s
 
       versions = Version.find(:all, :params => {:project_id => project.id})
 
@@ -293,7 +293,7 @@ repos.each do |repo|
         i.assigned_to_id = user.id unless user.nil?
       end
       
-
+      puts i.inspect
       if i.save!
         puts "issue saved"
       else
