@@ -288,8 +288,10 @@ repos.each do |repo|
           i.save!
         end
       end
-      i.custom_fields[0].value = Date.parse(ci.closed_at).to_s
-      i.save!
+      if i.respond_to? :custom_fields
+        i.custom_fields[0].value = Date.parse(ci.closed_at).to_s
+        i.save!
+      end
     end
   end
 end
