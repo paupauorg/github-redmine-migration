@@ -170,11 +170,13 @@ repos.each do |repo|
     end
     puts "Processing open issues"
 
-    versions = Version.find(:all, :params => {:project_id => project.id})
 
     open_issues.each do |oi|
       i = Issue.new project_id: project.id, status_id: open_issue_status.id, priority_id: normal_priority.id, subject: oi.title,
                 description: oi.body, start_date: Time.parse(oi.created_at).to_date, tracker_id: tracker.id
+
+      versions = Version.find(:all, :params => {:project_id => project.id})
+
       if !oi.milestone.nil?
         version = versions.find { |v| v.name.upcase == oi.milestone.title.upcase } unless versions.nil?
         if version.nil?
@@ -240,6 +242,9 @@ repos.each do |repo|
     closed_issues.each do |ci|
       i = Issue.new project_id: project.id, status_id: closed_issue_status.id, priority_id: normal_priority.id, subject: ci.title,
                     description: ci.body, start_date: Time.parse(ci.created_at).to_date, closed_on: Time.parse(ci.closed_at)
+
+      versions = Version.find(:all, :params => {:project_id => project.id})
+
       if !ci.milestone.nil?
         version = versions.find { |v| v.name.upcase == ci.milestone.title.upcase } unless versions.nil?
         if version.nil?
