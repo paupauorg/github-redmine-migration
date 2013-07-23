@@ -232,6 +232,7 @@ repos.each do |repo|
       i.remove_impersonation
       if oi.comments > 0
         github.issues.comments.list(user: ORGANIZATION, repo: name, issue_id: oi.number).each do |comment|
+          puts comment.inspect
           i.notes = comment.body
           i.save!
         end
