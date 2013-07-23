@@ -99,7 +99,7 @@ puts 'Name of normal priority - (default)'
 normal_priority_name = gets.chomp
 normal_priority_name = 'normal' if normal_priority_name == ''
 normal_priority = IssuePriority.all.detect { |ip| ip.name.upcase == normal_priority_name.upcase }
-$redmine_projects = Project.all
+$redmine_projects = Project.find(:all, params: {include: 'trackers'})
 $trackers = Tracker.all
 $users = User.all
 
@@ -156,11 +156,19 @@ repos.each do |repo|
     end
     $redmine_projects = Project.all
 
+    project  = Project.find(project.id, params: {include: 'trackers'})
+
     puts "Available trackers: #{tracker_names}"
     puts "Select tracker: - (bug)"
     tracker_name = gets.chomp
     tracker_name = 'Bug' if tracker_name == ''
     tracker = find_tracker(tracker_name)
+    if !project.trackers.include?(tracker)
+      puts "saving tracker"
+      project.trackers << tracker
+      project.tracker_ids = project.trackers.collect {|t| t.id}
+      project.save
+    end
     puts "Processing open issues"
 
     versions = Version.find(:all, :params => {:project_id => project.id})
