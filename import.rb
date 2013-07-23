@@ -14,14 +14,12 @@ class Issue < ActiveResource::Base
   self.site = REDMINE_SITE
   self.user = REDMINE_TOKEN
   self.password = 'nothing'
+
   def impersonate(login)
-    @headers = { 'X-Redmine-Switch-User' => login }
+    #headers['X-Redmine-Switch-User'] = 'tobias'
   end
   def remove_impersonation
-    @headers = { }
-  end
-  def head
-    @headers
+    #@headers = { }
   end
 end
 
@@ -99,7 +97,7 @@ puts 'Name of normal priority - (default)'
 normal_priority_name = gets.chomp
 normal_priority_name = 'normal' if normal_priority_name == ''
 normal_priority = IssuePriority.all.detect { |ip| ip.name.upcase == normal_priority_name.upcase }
-$redmine_projects = Project.find(:all, params: {include: 'trackers'})
+$redmine_projects = Project.find(:all)
 $trackers = Tracker.all
 $users = User.all
 
@@ -180,7 +178,7 @@ repos.each do |repo|
         version = versions.find { |v| v.name.upcase == oi.milestone.title.upcase } unless versions.nil?
         if version.nil?
           version = Version.new name: oi.milestone.title, status: oi.milestone.state, project_id: project.id
-          version.date = Date.parse(oi.milestone.due_on) unless oi.milestone.due_on.nil?
+          version.date = Date.parse(oi.milestone.due_on).to_s unless oi.milestone.due_on.nil?
           version.save!
         end
         i.fixed_version_id = version.id
@@ -242,7 +240,7 @@ repos.each do |repo|
         version = versions.find { |v| v.name.upcase == ci.milestone.title.upcase } unless versions.nil?
         if version.nil?
           version = Version.new name: ci.milestone.title, status: ci.milestone.state, project_id: project.id
-          version.date = Date.parse(ci.milestone.due_on) unless ci.milestone.due_on.nil?
+          version.date = Date.parse(ci.milestone.due_on).to_s unless ci.milestone.due_on.nil?
           version.save!
         end
         i.fixed_version_id = version.id
