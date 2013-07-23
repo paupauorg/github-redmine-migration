@@ -294,10 +294,11 @@ repos.each do |repo|
       end
       
       puts i.inspect
-      if i.save!
+      if i.save
         puts "issue saved"
       else
         puts "issue error #{i.errors.full_messages}"
+        exit
       end
 
       if ci.comments > 0
