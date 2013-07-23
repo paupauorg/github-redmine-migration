@@ -158,9 +158,9 @@ repos.each do |repo|
     project  = Project.find(project.id, params: {include: 'trackers'})
 
     puts "Available trackers: #{tracker_names}"
-    puts "Select tracker: - (bug)"
+    puts "Select tracker: - (Feature)"
     tracker_name = gets.chomp
-    tracker_name = 'Bug' if tracker_name == ''
+    tracker_name = 'Feature' if tracker_name == ''
     tracker = find_tracker(tracker_name)
     if !project.trackers.include?(tracker)
       puts "saving tracker"
@@ -243,7 +243,7 @@ repos.each do |repo|
     puts "Processing closed issues"
     closed_issues.each do |ci|
       description_text = ci.body
-      i = Issue.new project_id: project.id, status_id: closed_issue_status.id, priority_id: normal_priority.id, subject: ci.title,
+      i = Issue.new project_id: project.id, status_id: nil, priority_id: nil, subject: ci.title,
                     description: description_text.force_encoding('utf-8'), start_date: Time.parse(ci.created_at).to_date.to_s, closed_on: Time.parse(ci.closed_at).to_s
 
       versions = Version.find(:all, :params => {:project_id => project.id})
@@ -261,12 +261,12 @@ repos.each do |repo|
       if !ci.labels.nil? && !ci.labels.empty?
         label = ci.labels[0]
         categs = IssueCategory.find(:all, :params => {:project_id => project.id})
-        categ = categs.find { |c| c.name == label.name }
+        categ = categs.find { |c| c.name.upcase == label.name.upcase }
         if categ.nil?
           categ = IssueCategory.new name: label.name, project_id: project.id
           categ.save!
         end
-        #i.category_id = categ.id
+        i.category_id = categ.id
       end
       if !ci.user.nil?
         login = ci.user.login
