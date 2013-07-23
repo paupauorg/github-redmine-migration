@@ -1,3 +1,4 @@
+#encoding: utf-8
 require 'rubygems'
 gem 'activeresource', '~> 3.2.12'
 require 'active_resource'
@@ -178,8 +179,10 @@ repos.each do |repo|
         version = versions.find { |v| v.name.upcase == oi.milestone.title.upcase } unless versions.nil?
         if version.nil?
           version = Version.new name: oi.milestone.title, status: oi.milestone.state, project_id: project.id
-          version.date = Date.parse(oi.milestone.due_on).to_s unless oi.milestone.due_on.nil?
+          version.effective_date = Date.parse(oi.milestone.due_on).to_s unless oi.milestone.due_on.nil?
+          puts version.inspect
           version.save!
+          puts "versions saved"
         end
         i.fixed_version_id = version.id
       end
@@ -223,6 +226,7 @@ repos.each do |repo|
       else
         puts "issue error #{i.errors.full_messages}"
       end
+      #gets
       i.remove_impersonation
       if oi.comments > 0
         github.issues.comments.list(user: ORGANIZATION, repo: name, issue_id: oi.number).each do |comment|
