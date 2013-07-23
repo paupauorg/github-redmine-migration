@@ -98,7 +98,7 @@ puts 'Name of normal priority - (normal)'
 normal_priority_name = gets.chomp
 normal_priority_name = 'normal' if normal_priority_name == ''
 normal_priority = IssuePriority.all.detect { |ip| ip.name.upcase == normal_priority_name.upcase }
-$redmine_projects = Project.find(:all)
+$redmine_projects = Project.find(:all, params: { limit: 100 })
 $trackers = Tracker.all
 $users = User.all
 
@@ -153,7 +153,7 @@ repos.each do |repo|
     else
       puts "Project exists"
     end
-    $redmine_projects = Project.all
+    $redmine_projects = Project.find(:all, params: { limit: 100 })
 
     project  = Project.find(project.id, params: {include: 'trackers'})
 
