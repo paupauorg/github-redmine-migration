@@ -266,7 +266,7 @@ repos.each do |repo|
           categ = IssueCategory.new name: label.name, project_id: project.id
           categ.save!
         end
-        i.category_id = categ.id
+        #i.category_id = categ.id
       end
       if !ci.user.nil?
         login = ci.user.login
