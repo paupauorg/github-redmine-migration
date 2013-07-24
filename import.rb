@@ -32,8 +32,8 @@ class Issue < ActiveResource::Base
   self.user = REDMINE_TOKEN
   self.password = 'nothing'
 
-  def impersonate(login)
-    Issue.headers['X-Redmine-Switch-User'] = login
+  def impersonate(login = '')
+    Issue.headers['X-Redmine-Switch-User'] = login if login != ''
   end
 
   def remove_impersonation
@@ -214,7 +214,7 @@ repos.each do |repo|
       i = Issue.new project_id: project.id, status_id: open_issue_status.id, priority_id: normal_priority.id, subject: oi.title,
                 description: description_text.force_encoding('utf-8'), start_date: Time.parse(oi.created_at).to_date.to_s, tracker_id: tracker.id
 
-      versions = Version.find(:all, :params => {:project_id => project.id})
+      versions = Version.find(:all, :params => {project_id: project.id, limit: 100 })
 
       if !oi.milestone.nil?
         version = versions.find { |v| v.name.upcase == oi.milestone.title.upcase } unless versions.nil?
@@ -230,7 +230,7 @@ repos.each do |repo|
 
       if !oi.labels.nil? && !oi.labels.empty?
         label = oi.labels[0]
-        categs = IssueCategory.find(:all, :params => {:project_id => project.id})
+        categs = IssueCategory.find(:all, :params => {project_id: project.id, limit: 100 })
         categ = categs.find { |c| c.name == label.name }
         if categ.nil?
           categ = IssueCategory.new name: label.name, project_id: project.id
