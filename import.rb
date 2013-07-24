@@ -10,7 +10,7 @@ REDMINE_SITE = config['REDMINE_SITE']
 REDMINE_TOKEN = config['REDMINE_TOKEN']
 ORGANIZATION  = config['ORGANIZATION']
 GITHUB_TOKEN = config['GITHUB_TOKEN']
-
+single_repo = config['SINGLE_REPO']
 
 class MyConn < ActiveResource::Connection
 
@@ -169,13 +169,14 @@ def find_or_create_user(github_login)
   user
 end
 
+
 tracker_names = $trackers.collect { |t| t.name }
 $user_names = $users.collect { |u| u.login }
 project_names = $redmine_projects.collect { |p| p.name }
 repos.each_page do |page|
   page.each do |repo|
     name = repo.name
-    #next if name.upcase != "bewo-meta".upcase
+    next if single_repo != '' && name.upcase != single_repo.upcase
     puts "Processing Repo #{name}"
     open_issues = github.issues.list(user: ORGANIZATION, repo: name)
     puts "#{open_issues.size} open issues"
