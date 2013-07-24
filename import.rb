@@ -136,8 +136,20 @@ def set_user_mapping(redmine, github)
   $user_mapping[github] = find_user(redmine)
 end
 
+def find_or_create_user(github_login)
+  user = get_user_mapping(github_login.upcase)
+  if user.nil?
+    puts "Select mapping of github user #{github_login}  - 'skip' or blank for no mapping"
+    puts "Available users: #{$user_names}"
+    e_login = gets.chomp
+    set_user_mapping(e_login.upcase, github_login.upcase)
+    user = get_user_mapping(github_login.upcase)
+  end
+  user
+end
+
 tracker_names = $trackers.collect { |t| t.name }
-user_names = $users.collect { |u| u.login }
+$user_names = $users.collect { |u| u.login }
 project_names = $redmine_projects.collect { |p| p.name }
 
 repos.each do |repo|
@@ -214,27 +226,13 @@ repos.each do |repo|
       end
       if !oi.user.nil?
         login = oi.user.login
-        user = get_user_mapping(login.upcase)
-        if user.nil?
-          puts "Select mapping of github user #{login}  - 'skip' or blank for no mapping"
-          puts "Available users: #{user_names}"
-          e_login = gets.chomp
-          set_user_mapping(e_login.upcase, login.upcase)
-          user = get_user_mapping(login.upcase)
-        end
+        user = find_or_create_user(login)
         i.impersonate(user.login) unless user.nil?
       end
       if !oi.assignee.nil?
-        login = oi.assignee.login
-        user = get_user_mapping(login.upcase)
-        if user.nil?
-          puts "Select mapping of github user #{login}  - 'skip' or blank for no mapping"
-          puts "Available users: #{user_names}"
-          e_login = gets.chomp
-          set_user_mapping(e_login.upcase, login.upcase)
-          user = get_user_mapping(login.upcase)
-        end
-        i.assigned_to_id = user.id unless user.nil?
+       login = oi.assignee.login
+       user = find_or_create_user(login)
+       i.assigned_to_id = user.id unless user.nil?
       end
       if i.save
         puts "issue saved"
@@ -244,9 +242,14 @@ repos.each do |repo|
       i.remove_impersonation
       if oi.comments > 0
         github.issues.comments.list(user: ORGANIZATION, repo: name, issue_id: oi.number).each do |comment|
+          login = comment.user.login
+          user = find_or_create_user(login)
+
           comment_text = comment.body
+          i.impersonate(user.login) unless user.nil?
           i.notes = comment_text.force_encoding('utf-8')
           i.save!
+          i.remove_impersonation
         end
       end
     end
@@ -259,7 +262,7 @@ repos.each do |repo|
       con.user = Issue.user
       con.password = Issue.password
 
-      i = Issue.new project_id: project.id, status_id: closed_issue_status.id, priority_id: normal_priority.id, subject: ci.title,
+      i = Issue.new project_id: project.id, status_id: open_issue_status.id, priority_id: normal_priority.id, subject: ci.title,
                     description: description_text.force_encoding('utf-8'), start_date: Time.parse(ci.created_at).to_date.to_s, closed_on: Time.parse(ci.closed_at).to_s
 
       versions = Version.find(:all, :params => {:project_id => project.id})
@@ -286,26 +289,14 @@ repos.each do |repo|
       end
       if !ci.user.nil?
         login = ci.user.login
-        user = get_user_mapping(login.upcase)
-        if user.nil?
-          puts "Select mapping of github user #{login}  - 'skip' or blank for no mapping"
-          puts "Available users: #{user_names}"
-          e_login = gets.chomp
-          set_user_mapping(e_login.upcase, login.upcase)
-          user = get_user_mapping(login.upcase)
-        end
+        user = find_or_create_user(login)
+
         i.impersonate(user.login) unless user.nil?
       end
       if !ci.assignee.nil?
         login = ci.assignee.login
-        user = get_user_mapping(login.upcase)
-        if user.nil?
-          puts "Select mapping of github user #{login} - 'skip' or blank for no mapping"
-          puts "Available users: #{user_names}"
-          e_login = gets.chomp
-          set_user_mapping(e_login.upcase, login.upcase)
-          user = get_user_mapping(login.upcase)
-        end
+        user = find_or_create_user(login)
+
         i.assigned_to_id = user.id unless user.nil?
       end
       
@@ -314,6 +305,8 @@ repos.each do |repo|
         puts "issue saved"
       else
         puts "issue error #{i.errors.full_messages}"
+        puts con.last_resp.inspect
+        puts con.last_resp.to_hash
         puts con.last_resp.body.inspect
         exit
       end
@@ -329,6 +322,9 @@ repos.each do |repo|
         i.custom_fields[0].value = Date.parse(ci.closed_at).to_s
         i.save!
       end
+      i.remove_impersonation
+      i.status_id = closed_issue_status.id
+      i.save!
     end
   end
 end
