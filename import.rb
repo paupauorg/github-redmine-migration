@@ -271,12 +271,13 @@ repos.each do |repo|
       if !ci.milestone.nil?
         version = versions.find { |v| v.name.upcase == ci.milestone.title.upcase } unless versions.nil?
         if version.nil?
-          version = Version.new name: ci.milestone.title, status: ci.milestone.state, project_id: project.id
-          version.date = Date.parse(ci.milestone.due_on).to_s unless ci.milestone.due_on.nil?
+          version = Version.new name: ci.milestone.title, status: 'open', project_id: project.id
+          version.effective_date = Date.parse(ci.milestone.due_on).to_s unless ci.milestone.due_on.nil?
           version.save!
         end
         i.fixed_version_id = version.id
       end
+
 
       if !ci.labels.nil? && !ci.labels.empty?
         label = ci.labels[0]
