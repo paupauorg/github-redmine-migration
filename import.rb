@@ -33,11 +33,13 @@ class Issue < ActiveResource::Base
   self.password = 'nothing'
 
   def impersonate(login)
-  #  Issue.headers['X-Redmine-Switch-User'] = login
+    Issue.headers['X-Redmine-Switch-User'] = login
   end
+
   def remove_impersonation
-  #  Issue.headers['X-Redmine-Switch-User'] = 'admin'
+    Issue.headers['X-Redmine-Switch-User'] = ''
   end
+
 end
 
 class Project < ActiveResource::Base
@@ -80,6 +82,14 @@ class Version < ActiveResource::Base
   self.site = "#{REDMINE_SITE}/projects/:project_id"
   self.user = REDMINE_TOKEN
   self.password = 'nothing'
+end
+
+class UpdateVersion < ActiveResource::Base
+  self.format = :xml
+  self.site = REDMINE_SITE
+  self.user = REDMINE_TOKEN
+  self.password = 'nothing'
+  self.element_name = "version"
 end
 
 class IssueCategory < ActiveResource::Base
@@ -156,7 +166,7 @@ project_names = $redmine_projects.collect { |p| p.name }
 
 repos.each do |repo|
   name = repo.name
-  next if name.upcase != "bewo-meta".upcase
+  #next if name.upcase != "bewo-meta".upcase
   puts "Processing Repo #{name}"
   open_issues = github.issues.list(user: ORGANIZATION, repo: name)
   puts "#{open_issues.size} open issues"
@@ -166,6 +176,7 @@ repos.each do |repo|
   puts "Available projects #{project_names}"
   redmine_project = gets.chomp
   redmine_project = name if redmine_project == ''
+  closed_versions = []
   if redmine_project == 'skip'
     puts "Skipping #{name}"
   else
@@ -208,10 +219,11 @@ repos.each do |repo|
       if !oi.milestone.nil?
         version = versions.find { |v| v.name.upcase == oi.milestone.title.upcase } unless versions.nil?
         if version.nil?
-          version = Version.new name: oi.milestone.title, status: oi.milestone.state, project_id: project.id
+          version = Version.new name: oi.milestone.title, status: 'open', project_id: project.id
           version.effective_date = Date.parse(oi.milestone.due_on).to_s unless oi.milestone.due_on.nil?
           puts version.inspect
           version.save!
+          closed_versions << version
           puts "versions saved"
         end
         i.fixed_version_id = version.id
@@ -276,6 +288,7 @@ repos.each do |repo|
           version = Version.new name: ci.milestone.title, status: 'open', project_id: project.id
           version.effective_date = Date.parse(ci.milestone.due_on).to_s unless ci.milestone.due_on.nil?
           version.save!
+          closed_versions << version
         end
         i.fixed_version_id = version.id
       end
@@ -329,6 +342,12 @@ repos.each do |repo|
       i.remove_impersonation
       i.status_id = closed_issue_status.id
       i.save!
+    end
+    closed_versions.each do |cv|
+      version = UpdateVersion.find(cv.id)
+      version.status = 'closed'
+      version.project_id = project.id
+      version.save!
     end
   end
 end
