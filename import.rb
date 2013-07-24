@@ -336,8 +336,11 @@ repos.each_page do |page|
             end
           end
           if i.respond_to? :custom_fields
-            i.custom_fields[0].value = Date.parse(ci.closed_at).to_s
-            i.save!
+            date_field =  i.custom_fields.find {|field| field.name.upcase == 'close_date'.upcase }
+            if !date_field.nil?
+              i.custom_fields[0].value = Date.parse(ci.closed_at).to_s
+              i.save!
+            end
           end
           i.remove_impersonation
           i.status_id = closed_issue_status.id
