@@ -148,6 +148,15 @@ def set_user_mapping(redmine, github)
   $user_mapping[github] = find_user(redmine)
 end
 
+def convert_code_blocks(block)
+  i = 1
+  x = block.gsub('```') do |m|
+    i += 1
+    i % 2  == 0 ? '<pre><code>' : '</code></pre>'
+  end
+  x
+end
+
 def find_or_create_user(github_login)
   user = get_user_mapping(github_login.upcase)
   if user.nil?
@@ -211,7 +220,7 @@ repos.each_page do |page|
       puts "Processing open issues"
       open_issues.each_page do |page|
         page.each do |oi|
-          description_text = "#{oi.body} \n Github url: #{oi.html_url}"
+          description_text = "#{convert_code_blocks(oi.body)} \n Github url: #{oi.html_url}"
           i = Issue.new project_id: project.id, status_id: open_issue_status.id, priority_id: normal_priority.id, subject: oi.title,
                     description: description_text.force_encoding('utf-8'), start_date: Time.parse(oi.created_at).to_date.to_s, tracker_id: tracker.id
 
@@ -261,7 +270,7 @@ repos.each_page do |page|
                 login = comment.user.login
                 user = find_or_create_user(login)
 
-                comment_text = comment.body
+                comment_text = convert_code_blocks(comment.body)
                 i.impersonate(user.login) unless user.nil?
                 i.notes = comment_text.force_encoding('utf-8')
                 i.save!
@@ -274,7 +283,7 @@ repos.each_page do |page|
       puts "Processing closed issues"
       closed_issues.each_page do |page|
         page.each do |ci|
-          description_text = "#{ci.body} \n Github url: #{ci.html_url}"
+          description_text = "#{convert_code_blocks(ci.body)} \n Github url: #{ci.html_url}"
           i = Issue.new project_id: project.id, status_id: open_issue_status.id, priority_id: normal_priority.id, subject: ci.title, tracker_id: tracker.id,
                         description: description_text.force_encoding('utf-8'), start_date: Time.parse(ci.created_at).to_date.to_s, closed_on: Time.parse(ci.closed_at).to_s
 
@@ -327,7 +336,7 @@ repos.each_page do |page|
                 login = comment.user.login
                 user = find_or_create_user(login)
 
-                comment_text = comment.body
+                comment_text = convert_code_blocks(comment.body)
                 i.impersonate(user.login) unless user.nil?
                 i.notes = comment_text.force_encoding('utf-8')
                 i.save!
