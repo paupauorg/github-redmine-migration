@@ -10,7 +10,21 @@ GITHUB_TOKEN = ''
 ORGANIZATION = 'paupaude'
 
 
+class MyConn < ActiveResource::Connection
+
+  attr_reader :last_resp
+  def handle_response(resp)
+    @last_resp=resp
+    super
+  end
+end
+
+
 class Issue < ActiveResource::Base
+  class << self
+    attr_writer :connection
+  end
+
   self.format = :xml
   self.site = REDMINE_SITE
   self.user = REDMINE_TOKEN
@@ -169,8 +183,6 @@ repos.each do |repo|
       project.save
     end
     puts "Processing open issues"
-
-
     open_issues.each do |oi|
       description_text = oi.body
       i = Issue.new project_id: project.id, status_id: open_issue_status.id, priority_id: normal_priority.id, subject: oi.title,
@@ -224,7 +236,7 @@ repos.each do |repo|
         end
         i.assigned_to_id = user.id unless user.nil?
       end
-      if i.save!
+      if i.save
         puts "issue saved"
       else
         puts "issue error #{i.errors.full_messages}"
@@ -243,7 +255,12 @@ repos.each do |repo|
     puts "Processing closed issues"
     closed_issues.each do |ci|
       description_text = ci.body
-      i = Issue.new project_id: project.id, status_id: nil, priority_id: nil, subject: ci.title,
+
+      con = MyConn.new Issue.site, Issue.format
+      con.user = Issue.user
+      con.password = Issue.password
+
+      i = Issue.new project_id: project.id, status_id: closed_issue_status.id, priority_id: normal_priority.id, subject: ci.title,
                     description: description_text.force_encoding('utf-8'), start_date: Time.parse(ci.created_at).to_date.to_s, closed_on: Time.parse(ci.closed_at).to_s
 
       versions = Version.find(:all, :params => {:project_id => project.id})
@@ -298,6 +315,7 @@ repos.each do |repo|
         puts "issue saved"
       else
         puts "issue error #{i.errors.full_messages}"
+        puts con.last_resp.body.inspect
         exit
       end
 
