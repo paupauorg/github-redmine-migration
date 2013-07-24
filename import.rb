@@ -221,7 +221,6 @@ repos.each do |repo|
         if version.nil?
           version = Version.new name: oi.milestone.title, status: 'open', project_id: project.id
           version.effective_date = Date.parse(oi.milestone.due_on).to_s unless oi.milestone.due_on.nil?
-          puts version.inspect
           version.save!
           closed_versions << version
           puts "versions saved"
@@ -317,22 +316,22 @@ repos.each do |repo|
         i.assigned_to_id = user.id unless user.nil?
       end
       
-      puts i.inspect
-      if i.save
+      if i.save!
         puts "issue saved"
       else
         puts "issue error #{i.errors.full_messages}"
-        puts con.last_resp.inspect
-        puts con.last_resp.to_hash
-        puts con.last_resp.body.inspect
-        exit
       end
       i.remove_impersonation
       if ci.comments > 0
         github.issues.comments.list(user: ORGANIZATION, repo: name, issue_id: ci.number).each do |comment|
+          login = comment.user.login
+          user = find_or_create_user(login)
+
           comment_text = comment.body
+          i.impersonate(user.login) unless user.nil?
           i.notes = comment_text.force_encoding('utf-8')
           i.save!
+          i.remove_impersonation
         end
       end
       if i.respond_to? :custom_fields
