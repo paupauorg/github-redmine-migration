@@ -335,10 +335,11 @@ repos.each_page do |page|
               end
             end
           end
+          i.notes = ''
           if i.respond_to? :custom_fields
-            date_field =  i.custom_fields.find {|field| field.name.upcase == 'close_date'.upcase }
+            date_field =  i.custom_fields.find_index {|field| field.name.upcase == 'close_date'.upcase }
             if !date_field.nil?
-              i.custom_fields[0].value = Date.parse(ci.closed_at).to_s
+              i.custom_fields[date_field].value = Date.parse(ci.closed_at).to_s
               i.save!
             end
           end
