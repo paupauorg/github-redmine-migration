@@ -21,7 +21,7 @@ GITHUB_TOKEN: '5eba716ilikenumbers4aa93049f1ccf2ea'
 ORGANIZATION: 'organization_name'
 ````
 
-The user should be an administratrator.
+The user should be an administrator. And you should have a custom_field called `close_date` with type date, avalailable for all projects.
 
 ### 3. Running the script
 
