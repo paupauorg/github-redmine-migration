@@ -31,10 +31,10 @@ class Issue < ActiveResource::Base
   self.password = 'nothing'
 
   def impersonate(login)
-    #headers['X-Redmine-Switch-User'] = 'tobias'
+    Issue.headers['X-Redmine-Switch-User'] = login
   end
   def remove_impersonation
-    #@headers = { }
+    Issue.headers['X-Redmine-Switch-User'] = 'admin'
   end
 end
 
@@ -241,7 +241,6 @@ repos.each do |repo|
       else
         puts "issue error #{i.errors.full_messages}"
       end
-      #gets
       i.remove_impersonation
       if oi.comments > 0
         github.issues.comments.list(user: ORGANIZATION, repo: name, issue_id: oi.number).each do |comment|
@@ -295,7 +294,7 @@ repos.each do |repo|
           set_user_mapping(e_login.upcase, login.upcase)
           user = get_user_mapping(login.upcase)
         end
-        i.author_id = user.id  unless user.nil?
+        i.impersonate(user.login) unless user.nil?
       end
       if !ci.assignee.nil?
         login = ci.assignee.login
@@ -318,7 +317,7 @@ repos.each do |repo|
         puts con.last_resp.body.inspect
         exit
       end
-
+      i.remove_impersonation
       if ci.comments > 0
         github.issues.comments.list(user: ORGANIZATION, repo: name, issue_id: ci.number).each do |comment|
           comment_text = comment.body
