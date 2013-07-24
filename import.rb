@@ -3,11 +3,13 @@ require 'rubygems'
 gem 'activeresource', '~> 3.2.12'
 require 'active_resource'
 require 'github_api'
+require 'yaml'
 
-REDMINE_TOKEN = ''
-REDMINE_SITE = 'http://0.0.0.0:3000'
-GITHUB_TOKEN = ''
-ORGANIZATION = 'paupaude'
+config = YAML.load_file('config.yml')
+REDMINE_SITE = config['REDMINE_SITE']
+REDMINE_TOKEN = config['REDMINE_TOKEN']
+ORGANIZATION  = config['ORGANIZATION']
+GITHUB_TOKEN = config['GITHUB_TOKEN']
 
 
 class MyConn < ActiveResource::Connection
