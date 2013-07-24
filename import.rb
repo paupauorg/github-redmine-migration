@@ -31,10 +31,10 @@ class Issue < ActiveResource::Base
   self.password = 'nothing'
 
   def impersonate(login)
-    Issue.headers['X-Redmine-Switch-User'] = login
+  #  Issue.headers['X-Redmine-Switch-User'] = login
   end
   def remove_impersonation
-    Issue.headers['X-Redmine-Switch-User'] = 'admin'
+  #  Issue.headers['X-Redmine-Switch-User'] = 'admin'
   end
 end
 
@@ -262,7 +262,7 @@ repos.each do |repo|
       con.user = Issue.user
       con.password = Issue.password
 
-      i = Issue.new project_id: project.id, status_id: open_issue_status.id, priority_id: normal_priority.id, subject: ci.title,
+      i = Issue.new project_id: project.id, status_id: open_issue_status.id, priority_id: normal_priority.id, subject: ci.title, tracker_id: tracker.id,
                     description: description_text.force_encoding('utf-8'), start_date: Time.parse(ci.created_at).to_date.to_s, closed_on: Time.parse(ci.closed_at).to_s
 
       versions = Version.find(:all, :params => {:project_id => project.id})
