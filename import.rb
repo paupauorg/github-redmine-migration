@@ -163,190 +163,198 @@ end
 tracker_names = $trackers.collect { |t| t.name }
 $user_names = $users.collect { |u| u.login }
 project_names = $redmine_projects.collect { |p| p.name }
-
-repos.each do |repo|
-  name = repo.name
-  #next if name.upcase != "bewo-meta".upcase
-  puts "Processing Repo #{name}"
-  open_issues = github.issues.list(user: ORGANIZATION, repo: name)
-  puts "#{open_issues.size} open issues"
-  closed_issues = github.issues.list(user: ORGANIZATION, repo: name, state: 'closed')
-  puts "#{closed_issues.size} closed issues"
-  puts "Enter name of Redmine project - type 'skip' to skip - (#{name})"
-  puts "Available projects #{project_names}"
-  redmine_project = gets.chomp
-  redmine_project = name if redmine_project == ''
-  closed_versions = []
-  if redmine_project == 'skip'
-    puts "Skipping #{name}"
-  else
-    project = find_project(redmine_project)
-    if project.nil?
-      puts "creating #{redmine_project} project"
-      project = Project.new(name: redmine_project, identifier: redmine_project)
-      if project.save
-        puts "project saved"
-      else
-        puts "project error #{project.errors.full_messages}"
-        abort("Cannot continue")
-      end
+repos.each_page do |page|
+  page.each do |repo|
+    name = repo.name
+    #next if name.upcase != "bewo-meta".upcase
+    puts "Processing Repo #{name}"
+    open_issues = github.issues.list(user: ORGANIZATION, repo: name)
+    puts "#{open_issues.size} open issues"
+    closed_issues = github.issues.list(user: ORGANIZATION, repo: name, state: 'closed')
+    puts "#{closed_issues.size} closed issues"
+    puts "Enter name of Redmine project - type 'skip' to skip - (#{name})"
+    puts "Available projects #{project_names}"
+    redmine_project = gets.chomp
+    redmine_project = name if redmine_project == ''
+    closed_versions = []
+    if redmine_project == 'skip'
+      puts "Skipping #{name}"
     else
-      puts "Project exists"
-    end
-    $redmine_projects = Project.find(:all, params: { limit: 100 })
-
-    project  = Project.find(project.id, params: {include: 'trackers'})
-
-    puts "Available trackers: #{tracker_names}"
-    puts "Select tracker: - (Feature)"
-    tracker_name = gets.chomp
-    tracker_name = 'Feature' if tracker_name == ''
-    tracker = find_tracker(tracker_name)
-    if !project.trackers.include?(tracker)
-      puts "saving tracker"
-      project.trackers << tracker
-      project.tracker_ids = project.trackers.collect {|t| t.id}
-      project.save
-    end
-    puts "Processing open issues"
-    open_issues.each do |oi|
-      description_text = oi.body
-      i = Issue.new project_id: project.id, status_id: open_issue_status.id, priority_id: normal_priority.id, subject: oi.title,
-                description: description_text.force_encoding('utf-8'), start_date: Time.parse(oi.created_at).to_date.to_s, tracker_id: tracker.id
-
-      versions = Version.find(:all, :params => {project_id: project.id, limit: 100 })
-
-      if !oi.milestone.nil?
-        version = versions.find { |v| v.name.upcase == oi.milestone.title.upcase } unless versions.nil?
-        if version.nil?
-          version = Version.new name: oi.milestone.title, status: 'open', project_id: project.id
-          version.effective_date = Date.parse(oi.milestone.due_on).to_s unless oi.milestone.due_on.nil?
-          version.save!
-          closed_versions << version
-          puts "versions saved"
+      project = find_project(redmine_project)
+      if project.nil?
+        puts "creating #{redmine_project} project"
+        project = Project.new(name: redmine_project, identifier: redmine_project)
+        if project.save
+          puts "project saved"
+        else
+          puts "project error #{project.errors.full_messages}"
+          abort("Cannot continue")
         end
-        i.fixed_version_id = version.id
-      end
-
-      if !oi.labels.nil? && !oi.labels.empty?
-        label = oi.labels[0]
-        categs = IssueCategory.find(:all, :params => {project_id: project.id, limit: 100 })
-        categ = categs.find { |c| c.name == label.name }
-        if categ.nil?
-          categ = IssueCategory.new name: label.name, project_id: project.id
-          categ.save!
-        end
-        i.category_id = categ.id
-      end
-      if !oi.user.nil?
-        login = oi.user.login
-        user = find_or_create_user(login)
-        i.impersonate(user.login) unless user.nil?
-      end
-      if !oi.assignee.nil?
-       login = oi.assignee.login
-       user = find_or_create_user(login)
-       i.assigned_to_id = user.id unless user.nil?
-      end
-      if i.save
-        puts "issue saved"
       else
-        puts "issue error #{i.errors.full_messages}"
+        puts "Project exists"
       end
-      i.remove_impersonation
-      if oi.comments > 0
-        github.issues.comments.list(user: ORGANIZATION, repo: name, issue_id: oi.number).each do |comment|
-          login = comment.user.login
-          user = find_or_create_user(login)
+      $redmine_projects = Project.find(:all, params: { limit: 100 })
 
-          comment_text = comment.body
-          i.impersonate(user.login) unless user.nil?
-          i.notes = comment_text.force_encoding('utf-8')
-          i.save!
+      project  = Project.find(project.id, params: {include: 'trackers'})
+
+      puts "Available trackers: #{tracker_names}"
+      puts "Select tracker: - (Feature)"
+      tracker_name = gets.chomp
+      tracker_name = 'Feature' if tracker_name == ''
+      tracker = find_tracker(tracker_name)
+      if !project.trackers.include?(tracker)
+        puts "saving tracker"
+        project.trackers << tracker
+        project.tracker_ids = project.trackers.collect {|t| t.id}
+        project.save
+      end
+      puts "Processing open issues"
+      open_issues.each_page do |page|
+        page.each do |oi|
+          description_text = oi.body
+          i = Issue.new project_id: project.id, status_id: open_issue_status.id, priority_id: normal_priority.id, subject: oi.title,
+                    description: description_text.force_encoding('utf-8'), start_date: Time.parse(oi.created_at).to_date.to_s, tracker_id: tracker.id
+
+          versions = Version.find(:all, :params => {project_id: project.id, limit: 100 })
+
+          if !oi.milestone.nil?
+            version = versions.find { |v| v.name.upcase == oi.milestone.title.upcase } unless versions.nil?
+            if version.nil?
+              version = Version.new name: oi.milestone.title, status: 'open', project_id: project.id
+              version.effective_date = Date.parse(oi.milestone.due_on).to_s unless oi.milestone.due_on.nil?
+              version.save!
+              closed_versions << version
+              puts "versions saved"
+            end
+            i.fixed_version_id = version.id
+          end
+
+          if !oi.labels.nil? && !oi.labels.empty?
+            label = oi.labels[0]
+            categs = IssueCategory.find(:all, :params => {project_id: project.id, limit: 100 })
+            categ = categs.find { |c| c.name == label.name }
+            if categ.nil?
+              categ = IssueCategory.new name: label.name, project_id: project.id
+              categ.save!
+            end
+            i.category_id = categ.id
+          end
+          if !oi.user.nil?
+            login = oi.user.login
+            user = find_or_create_user(login)
+            i.impersonate(user.login) unless user.nil?
+          end
+          if !oi.assignee.nil?
+           login = oi.assignee.login
+           user = find_or_create_user(login)
+           i.assigned_to_id = user.id unless user.nil?
+          end
+          if i.save
+            puts "issue saved"
+          else
+            puts "issue error #{i.errors.full_messages}"
+          end
           i.remove_impersonation
+          if oi.comments > 0
+            github.issues.comments.list(user: ORGANIZATION, repo: name, issue_id: oi.number).each_page do |page|
+              page.each do |comment|
+                login = comment.user.login
+                user = find_or_create_user(login)
+
+                comment_text = comment.body
+                i.impersonate(user.login) unless user.nil?
+                i.notes = comment_text.force_encoding('utf-8')
+                i.save!
+                i.remove_impersonation
+              end
+            end
+          end
         end
       end
-    end
+      puts "Processing closed issues"
+      closed_issues.each_page do |page|
+        page.each do |ci|
+          description_text = ci.body
 
-    puts "Processing closed issues"
-    closed_issues.each do |ci|
-      description_text = ci.body
+          con = MyConn.new Issue.site, Issue.format
+          con.user = Issue.user
+          con.password = Issue.password
+          Issue.connection = con
+          i = Issue.new project_id: project.id, status_id: open_issue_status.id, priority_id: normal_priority.id, subject: ci.title, tracker_id: tracker.id,
+                        description: description_text.force_encoding('utf-8'), start_date: Time.parse(ci.created_at).to_date.to_s, closed_on: Time.parse(ci.closed_at).to_s
 
-      con = MyConn.new Issue.site, Issue.format
-      con.user = Issue.user
-      con.password = Issue.password
-      Issue.connection = con
-      i = Issue.new project_id: project.id, status_id: open_issue_status.id, priority_id: normal_priority.id, subject: ci.title, tracker_id: tracker.id,
-                    description: description_text.force_encoding('utf-8'), start_date: Time.parse(ci.created_at).to_date.to_s, closed_on: Time.parse(ci.closed_at).to_s
+          versions = Version.find(:all, :params => {:project_id => project.id})
 
-      versions = Version.find(:all, :params => {:project_id => project.id})
-
-      if !ci.milestone.nil?
-        version = versions.find { |v| v.name.upcase == ci.milestone.title.upcase } unless versions.nil?
-        if version.nil?
-          version = Version.new name: ci.milestone.title, status: 'open', project_id: project.id
-          version.effective_date = Date.parse(ci.milestone.due_on).to_s unless ci.milestone.due_on.nil?
-          version.save!
-          closed_versions << version
-        end
-        i.fixed_version_id = version.id
-      end
+          if !ci.milestone.nil?
+            version = versions.find { |v| v.name.upcase == ci.milestone.title.upcase } unless versions.nil?
+            if version.nil?
+              version = Version.new name: ci.milestone.title, status: 'open', project_id: project.id
+              version.effective_date = Date.parse(ci.milestone.due_on).to_s unless ci.milestone.due_on.nil?
+              version.save!
+              closed_versions << version
+            end
+            i.fixed_version_id = version.id
+          end
 
 
-      if !ci.labels.nil? && !ci.labels.empty?
-        label = ci.labels[0]
-        categs = IssueCategory.find(:all, :params => {:project_id => project.id})
-        categ = categs.find { |c| c.name.upcase == label.name.upcase }
-        if categ.nil?
-          categ = IssueCategory.new name: label.name, project_id: project.id
-          categ.save!
-        end
-        i.category_id = categ.id
-      end
-      if !ci.user.nil?
-        login = ci.user.login
-        user = find_or_create_user(login)
+          if !ci.labels.nil? && !ci.labels.empty?
+            label = ci.labels[0]
+            categs = IssueCategory.find(:all, :params => {:project_id => project.id})
+            categ = categs.find { |c| c.name.upcase == label.name.upcase }
+            if categ.nil?
+              categ = IssueCategory.new name: label.name, project_id: project.id
+              categ.save!
+            end
+            i.category_id = categ.id
+          end
+          if !ci.user.nil?
+            login = ci.user.login
+            user = find_or_create_user(login)
 
-        i.impersonate(user.login) unless user.nil?
-      end
-      if !ci.assignee.nil?
-        login = ci.assignee.login
-        user = find_or_create_user(login)
+            i.impersonate(user.login) unless user.nil?
+          end
+          if !ci.assignee.nil?
+            login = ci.assignee.login
+            user = find_or_create_user(login)
 
-        i.assigned_to_id = user.id unless user.nil?
-      end
-      
-      if i.save!
-        puts "issue saved"
-      else
-        puts "issue error #{i.errors.full_messages}"
-      end
-      i.remove_impersonation
-      if ci.comments > 0
-        github.issues.comments.list(user: ORGANIZATION, repo: name, issue_id: ci.number).each do |comment|
-          login = comment.user.login
-          user = find_or_create_user(login)
+            i.assigned_to_id = user.id unless user.nil?
+          end
 
-          comment_text = comment.body
-          i.impersonate(user.login) unless user.nil?
-          i.notes = comment_text.force_encoding('utf-8')
-          i.save!
+          if i.save!
+            puts "issue saved"
+          else
+            puts "issue error #{i.errors.full_messages}"
+          end
           i.remove_impersonation
+          if ci.comments > 0
+            github.issues.comments.list(user: ORGANIZATION, repo: name, issue_id: ci.number).each_page do |page|
+              page.each do |comment|
+                login = comment.user.login
+                user = find_or_create_user(login)
+
+                comment_text = comment.body
+                i.impersonate(user.login) unless user.nil?
+                i.notes = comment_text.force_encoding('utf-8')
+                i.save!
+                i.remove_impersonation
+              end
+            end
+          end
+          if i.respond_to? :custom_fields
+            i.custom_fields[0].value = Date.parse(ci.closed_at).to_s
+            i.save!
+          end
+          i.remove_impersonation
+          i.status_id = closed_issue_status.id
+          i.save!
         end
       end
-      if i.respond_to? :custom_fields
-        i.custom_fields[0].value = Date.parse(ci.closed_at).to_s
-        i.save!
+      closed_versions.each do |cv|
+        version = UpdateVersion.find(cv.id)
+        version.status = 'closed'
+        version.project_id = project.id
+        version.save!
       end
-      i.remove_impersonation
-      i.status_id = closed_issue_status.id
-      i.save!
-    end
-    closed_versions.each do |cv|
-      version = UpdateVersion.find(cv.id)
-      version.status = 'closed'
-      version.project_id = project.id
-      version.save!
     end
   end
 end
