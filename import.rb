@@ -232,7 +232,7 @@ repos.each_page do |page|
               version = Version.new name: oi.milestone.title, status: 'open', project_id: project.id
               version.effective_date = Date.parse(oi.milestone.due_on).to_s unless oi.milestone.due_on.nil?
               version.save!
-              closed_versions << version
+              closed_versions << version if oi.milestone.state == 'closed'
               puts "versions saved"
             end
             i.fixed_version_id = version.id
@@ -295,7 +295,7 @@ repos.each_page do |page|
               version = Version.new name: ci.milestone.title, status: 'open', project_id: project.id
               version.effective_date = Date.parse(ci.milestone.due_on).to_s unless ci.milestone.due_on.nil?
               version.save!
-              closed_versions << version
+              closed_versions << version if ci.milestone.state == 'closed'
             end
             i.fixed_version_id = version.id
           end
