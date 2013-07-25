@@ -20,6 +20,8 @@ The user should be an administrator. And you should have a custom_field called `
 
 You can use the `REPOSITORY_FILTER` array to process only some of the repositories.
 
+You can store the issue close date in the due_date by setting `CLOSE_DATE` to `due_date`, you can store it in a custom_field by setting `CLOSE_DATE` to the name of the field or ignore it by setting `CLOSE_DATE` to `none`.
+
 ### 3. Running the script
 
 You can run the script with

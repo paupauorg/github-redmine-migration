@@ -11,7 +11,8 @@ REDMINE_SITE = config['REDMINE_SITE']
 REDMINE_TOKEN = config['REDMINE_TOKEN']
 ORGANIZATION  = config['ORGANIZATION']
 GITHUB_TOKEN = config['GITHUB_TOKEN']
-repository_filter = config['REPOSITORY_FILTER'] || []
+REPOSITORY_FILTER = config['REPOSITORY_FILTER'] || []
+CLOSE_DATE = config['CLOSE_DATE'] || 'none'
 
 class MyConn < ActiveResource::Connection
 
@@ -210,12 +211,12 @@ end
 
 tracker_names = $trackers.collect { |t| t.name }
 $user_names = $users.collect { |u| u.login }
-puts "Only processing #{repository_filter}" unless repository_filter.nil? || repository_filter == []
+puts "Only processing #{REPOSITORY_FILTER}" unless REPOSITORY_FILTER.nil? || REPOSITORY_FILTER == []
 project_names = $redmine_projects.collect { |p| p.name }
 repos.each_page do |page|
   page.each do |repo|
     name = repo.name
-    next if repository_filter.size > 0 && !repository_filter.include?(repo.name)
+    next if REPOSITORY_FILTER.size > 0 && !REPOSITORY_FILTER.include?(repo.name)
     puts "Processing Repo #{name}"
     open_issues = github.issues.list(user: ORGANIZATION, repo: name)
     puts "#{open_issues.size} open issues"
@@ -378,11 +379,17 @@ repos.each_page do |page|
             end
           end
           i.notes = ''
-          if i.respond_to? :custom_fields
-            date_field =  i.custom_fields.find_index {|field| field.name.upcase == 'close_date'.upcase }
-            if !date_field.nil?
-              i.custom_fields[date_field].value = Date.parse(ci.closed_at).to_s
-              i.save!
+          if CLOSE_DATE != 'none'
+            if CLOSE_DATE == 'due_date'
+              i.due_date = Date.parse(ci.closed_at).to_s
+            else
+              if i.respond_to? :custom_fields
+                date_field =  i.custom_fields.find_index {|field| field.name.upcase == CLOSE_DATE.upcase }
+                if !date_field.nil?
+                  i.custom_fields[date_field].value = Date.parse(ci.closed_at).to_s
+                  i.save!
+                end
+              end
             end
           end
           i.remove_impersonation

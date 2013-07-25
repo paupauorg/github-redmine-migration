@@ -4,3 +4,5 @@ GITHUB_TOKEN: ''
 ORGANIZATION: ''
 REPOSITORY_FILTER:
                     - repository_name_leave
+
+CLOSE_DATE: none
