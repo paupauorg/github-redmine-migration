@@ -277,6 +277,11 @@ repos.each_page do |page|
               version.save!
               closed_versions << version if oi.milestone.state == 'closed'
               puts "versions saved"
+            elsif version.status == 'closed'
+              ver = UpdateVersion.find(version.id)
+              ver.status = 'open'
+              ver.save!
+              closed_versions << ver
             end
             i.fixed_version_id = version.id
           end
@@ -335,6 +340,11 @@ repos.each_page do |page|
               version.effective_date = Date.parse(ci.milestone.due_on).to_s unless ci.milestone.due_on.nil?
               version.save!
               closed_versions << version if ci.milestone.state == 'closed'
+            elsif version.status == 'closed'
+              ver = UpdateVersion.find(version.id)
+              ver.status = 'open'
+              ver.save!
+              closed_versions << ver
             end
             i.fixed_version_id = version.id
           end
