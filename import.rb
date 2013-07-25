@@ -281,14 +281,7 @@ repos.each_page do |page|
           end
 
           if !oi.labels.nil? && !oi.labels.empty?
-            label = oi.labels[0]
-            categs = IssueCategory.find(:all, :params => {project_id: project.id, limit: 100 })
-            categ = categs.find { |c| c.name == label.name }
-            if categ.nil?
-              categ = IssueCategory.new name: label.name, project_id: project.id
-              categ.save!
-            end
-            i.category_id = categ.id
+            i.description += "\nNotes: #{oi.labels.collect {|label| label.name }.to_s}"
           end
           if !oi.user.nil?
             login = oi.user.login
@@ -347,14 +340,7 @@ repos.each_page do |page|
 
 
           if !ci.labels.nil? && !ci.labels.empty?
-            label = ci.labels[0]
-            categs = IssueCategory.find(:all, :params => {:project_id => project.id})
-            categ = categs.find { |c| c.name.upcase == label.name.upcase }
-            if categ.nil?
-              categ = IssueCategory.new name: label.name, project_id: project.id
-              categ.save!
-            end
-            i.category_id = categ.id
+            i.description += "\nNotes: #{ci.labels.collect {|label| label.name }.to_s}"
           end
           if !ci.user.nil?
             login = ci.user.login
