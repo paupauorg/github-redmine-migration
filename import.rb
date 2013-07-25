@@ -99,6 +99,21 @@ class IssueCategory < ActiveResource::Base
   self.password = 'nothing'
 end
 
+class Role < ActiveResource::Base
+  self.format = :xml
+  self.site = REDMINE_SITE
+  self.user = REDMINE_TOKEN
+  self.password = 'nothing'
+end
+
+
+class Membership < ActiveResource::Base
+  self.format = :xml
+  self.site = "#{REDMINE_SITE}/projects/:project_id"
+  self.user = REDMINE_TOKEN
+  self.password = 'nothing'
+end
+
 
 
 github = Github.new do |config|
@@ -110,6 +125,7 @@ github = Github.new do |config|
 end
 
 $user_mapping = {}
+$project_memberships = {}
 repos =  github.repos.list(org: ORGANIZATION)
 issue_statuses =  IssueStatus.all
 puts 'Name of open issue status - (Backlog)'
@@ -127,7 +143,11 @@ normal_priority = IssuePriority.all.detect { |ip| ip.name.upcase == normal_prior
 $redmine_projects = Project.find(:all, params: { limit: 100 })
 $trackers = Tracker.all
 $users = User.all
-
+roles = Role.all
+puts 'Name of default role - (reporter)'
+reporter_name = gets.chomp
+reporter_name = 'reporter' if reporter_name == ''
+$reporter = Role.all.find { |role| role.name.upcase == reporter_name.upcase }
 def find_project(name)
   $redmine_projects.find { |p| p.name.upcase == name.upcase }
 end
@@ -169,6 +189,22 @@ def find_or_create_user(github_login)
   user
 end
 
+def check_or_create_membership(project, user)
+  $project_memberships[project.id] = [] unless $project_memberships.has_key? project.id
+  member = $project_memberships[project.id].find {|member| member == user.id}
+  if member.nil?
+    membership = Membership.new(user_id: user.id, role_ids: [$reporter.id], project_id: project.id )
+    membership.save!
+    $project_memberships[project.id] << user.id
+    member = user.id
+  end
+  return member.nil? ? false : true
+end
+
+def add_members_to_project_mapping(project, memberships)
+  $project_memberships[project.id] = [] unless $project_memberships.has_key? project.id
+  memberships.each { |membership| $project_memberships[project.id] << membership.user.id }
+end
 
 tracker_names = $trackers.collect { |t| t.name }
 $user_names = $users.collect { |u| u.login }
@@ -206,7 +242,8 @@ repos.each_page do |page|
       $redmine_projects = Project.find(:all, params: { limit: 100 })
 
       project  = Project.find(project.id, params: {include: 'trackers'})
-
+      memberships = Membership.find(:all, params: {project_id: project.id})
+      add_members_to_project_mapping(project, memberships)
       puts "Available trackers: #{tracker_names}"
       puts "Select tracker: - (Feature)"
       tracker_name = gets.chomp
@@ -252,6 +289,7 @@ repos.each_page do |page|
           if !oi.user.nil?
             login = oi.user.login
             user = find_or_create_user(login)
+            check_or_create_membership(project, user) unless user.nil?
             i.impersonate(user.login) unless user.nil?
           end
           if !oi.assignee.nil?
@@ -272,6 +310,7 @@ repos.each_page do |page|
                 user = find_or_create_user(login)
 
                 comment_text = convert_code_blocks(comment.body)
+                check_or_create_membership(project, user) unless user.nil?
                 i.impersonate(user.login) unless user.nil?
                 i.notes = comment_text.force_encoding('utf-8')
                 i.save!
@@ -316,6 +355,7 @@ repos.each_page do |page|
             login = ci.user.login
             user = find_or_create_user(login)
 
+            check_or_create_membership(project, user) unless user.nil?
             i.impersonate(user.login) unless user.nil?
           end
           if !ci.assignee.nil?
@@ -338,6 +378,7 @@ repos.each_page do |page|
                 user = find_or_create_user(login)
 
                 comment_text = convert_code_blocks(comment.body)
+                check_or_create_membership(project, user) unless user.nil?
                 i.impersonate(user.login) unless user.nil?
                 i.notes = comment_text.force_encoding('utf-8')
                 i.save!
