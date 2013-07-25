@@ -13,6 +13,10 @@ ORGANIZATION  = config['ORGANIZATION']
 GITHUB_TOKEN = config['GITHUB_TOKEN']
 REPOSITORY_FILTER = config['REPOSITORY_FILTER'] || []
 CLOSE_DATE = config['CLOSE_DATE'] || 'none'
+open_issue_status_name = config['OPEN_ISSUE_STATUS_NAME']
+closed_issue_status_name = config['CLOSED_ISSUE_STATUS_NAME']
+default_priority_name = config['DEFAULT_PRIORITY_NAME']
+default_role_name = config['DEFAULT_ROLE']
 
 class MyConn < ActiveResource::Connection
 
@@ -130,26 +134,42 @@ $user_mapping = {}
 $project_memberships = {}
 repos =  github.repos.list(org: ORGANIZATION)
 issue_statuses =  IssueStatus.all
-puts 'Name of open issue status - (Backlog)'
-open_issue_status_name = gets.chomp
-open_issue_status_name = 'Backlog' if open_issue_status_name == ''
+priorities = IssuePriority.all
+issue_status_names = issue_statuses.collect { |is| is.name }
+priority_names = priorities.collect { |p| p.name }
+if open_issue_status_name.nil?
+  puts "Name of open issue status - #{issue_status_names}"
+  open_issue_status_name = gets.chomp
+end
 open_issue_status = issue_statuses.detect { |is| is.name.upcase == open_issue_status_name.upcase}
-puts 'Name of closed issue status - (Done)'
-closed_issue_status_name = gets.chomp
-closed_issue_status_name = 'Done' if closed_issue_status_name == ''
+
+if closed_issue_status_name.nil?
+  puts "Name of closed issue status - #{issue_status_names}"
+  closed_issue_status_name = gets.chomp
+end
 closed_issue_status = issue_statuses.detect { |is| is.name.upcase == closed_issue_status_name.upcase}
-puts 'Name of normal priority - (normal)'
-normal_priority_name = gets.chomp
-normal_priority_name = 'normal' if normal_priority_name == ''
-normal_priority = IssuePriority.all.detect { |ip| ip.name.upcase == normal_priority_name.upcase }
+
+if default_priority_name.nil?
+  puts "Name of normal priority - #{priority_names}"
+  default_priority_name = gets.chomp
+end
+
+normal_priority = priorities.detect { |ip| ip.name.upcase == default_priority_name.upcase }
+roles = Role.all
+
+if default_role_name.nil?
+  role_names = roles.collect { |r| r.name }
+  puts "Name of default role - #{role_names}"
+  default_role_name = gets.chomp
+end
+
+$reporter = Role.all.find { |role| role.name.upcase == default_role_name.upcase }
+
 $redmine_projects = Project.find(:all, params: { limit: 100 })
 $trackers = Tracker.all
 $users = User.all
-roles = Role.all
-puts 'Name of default role - (reporter)'
-reporter_name = gets.chomp
-reporter_name = 'reporter' if reporter_name == ''
-$reporter = Role.all.find { |role| role.name.upcase == reporter_name.upcase }
+
+
 def find_project(name)
   $redmine_projects.find { |p| p.name.upcase == name.upcase }
 end
