@@ -261,7 +261,8 @@ repos.each_page do |page|
       puts "Processing open issues"
       open_issues.each_page do |page|
         page.each do |oi|
-          description_text = "#{PandocRuby.convert(convert_code_blocks(oi.body), from: 'markdown_github', to: 'textile')} \n Github url: #{oi.html_url}"
+          description_text = "#{PandocRuby.convert(convert_code_blocks(oi.body), from: 'markdown_github', to: 'textile')} \n--------------------------------------------------
+\nGithub url: #{oi.html_url}"
           i = Issue.new project_id: project.id, status_id: open_issue_status.id, priority_id: normal_priority.id, subject: oi.title,
                     description: description_text.force_encoding('utf-8'), start_date: Time.parse(oi.created_at).to_date.to_s, tracker_id: tracker.id
 
@@ -326,7 +327,8 @@ repos.each_page do |page|
       puts "Processing closed issues"
       closed_issues.each_page do |page|
         page.each do |ci|
-          description_text = "#{PandocRuby.convert(convert_code_blocks(ci.body), from: 'markdown_github', to: 'textile')} \n Github url: #{ci.html_url}"
+          description_text = "#{PandocRuby.convert(convert_code_blocks(ci.body), from: 'markdown_github', to: 'textile')} \n--------------------------------------------------
+\nGithub url: #{ci.html_url}"
           i = Issue.new project_id: project.id, status_id: open_issue_status.id, priority_id: normal_priority.id, subject: ci.title, tracker_id: tracker.id,
                         description: description_text.force_encoding('utf-8'), start_date: Time.parse(ci.created_at).to_date.to_s, closed_on: Time.parse(ci.closed_at).to_s
 
