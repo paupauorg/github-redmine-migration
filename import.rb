@@ -208,6 +208,7 @@ end
 
 tracker_names = $trackers.collect { |t| t.name }
 $user_names = $users.collect { |u| u.login }
+puts "Only processing #{single_repo}" unless single_repo == ''
 project_names = $redmine_projects.collect { |p| p.name }
 repos.each_page do |page|
   page.each do |repo|
