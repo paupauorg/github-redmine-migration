@@ -30,3 +30,11 @@ ruby import.rb
 ````
 
 The script will guide you through importing.
+
+
+### 4. Known issues
+
+* users must be created before running the script
+* only labels/milestones that have issues will be imported
+* creation and closing dates cannot be set, this applies to notes too.
+
