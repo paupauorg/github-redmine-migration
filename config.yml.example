@@ -2,4 +2,5 @@ REDMINE_TOKEN: ''
 REDMINE_SITE: ''
 GITHUB_TOKEN: ''
 ORGANIZATION: ''
-SINGLE_REPO: ''
+REPOSITORY_FILTER:
+                    - repository_name_leave

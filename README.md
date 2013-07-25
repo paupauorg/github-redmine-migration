@@ -14,16 +14,11 @@ Also, you have to enable Redmine Api by checking `Enable REST web service` in `A
 
 ### 2. Configuration
 
-Open `config.yml` and fill in your Redmine site address, Redmine API key, Github token and your organization name
-
-````
-REDMINE_TOKEN: '5eba716ilikenumbers4aa93049f1ccf2ea'
-REDMINE_SITE: 'http://0.0.0.0:3000'
-GITHUB_TOKEN: '5eba716ilikenumbers4aa93049f1ccf2ea'
-ORGANIZATION: 'organization_name'
-````
+Copy `config.yml.example` to `config.yml` and fill in your Redmine site address, Redmine API key, Github token and your organization name
 
 The user should be an administrator. And you should have a custom_field called `close_date` with type date, avalailable for all projects.
+
+You can use the `REPOSITORY_FILTER` array to process only some of the repositories.
 
 ### 3. Running the script
 
