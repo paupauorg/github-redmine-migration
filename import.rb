@@ -201,7 +201,7 @@ end
 
 
 def clean_pandoc(block)
-  block.gsub('"$":', '').gsub('!http', '!{width: 100%}http')
+  block.gsub('"$":', '').gsub('!http', '!{width: 50%}http')
 end
 
 def find_or_create_user(github_login)
