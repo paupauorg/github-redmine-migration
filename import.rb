@@ -330,19 +330,50 @@ repos.each_page do |page|
             puts "issue error #{i.errors.full_messages}"
           end
           i.remove_impersonation
+          history_events = []
+          github.issues.events.list(user: ORGANIZATION, repo: name, issue_id: oi.number).each_page do |page|
+            page.each do |event|
+              history_events << {type: event.event, user: event.actor.login, date: Time.parse(event.created_at)} if ['closed', 'reopened'].include? event.event
+            end
+          end
           if oi.comments > 0
             github.issues.comments.list(user: ORGANIZATION, repo: name, issue_id: oi.number).each_page do |page|
               page.each do |comment|
-                login = comment.user.login
-                user = find_or_create_user(login)
-
-                comment_text = clean_pandoc(PandocRuby.convert(convert_code_blocks(comment.body), from: 'markdown_github', to: 'textile'))
-                check_or_create_membership(project, user) unless user.nil?
-                i.impersonate(user.login) unless user.nil?
-                i.notes = comment_text.force_encoding('utf-8')
-                i.save!
-                i.remove_impersonation
+                history_events << {type: 'comment', date: Time.parse(comment.created_at), comment: comment}
               end
+            end
+          end
+          history_events.sort! {|x,y| x[:date] <=> y[:date]}
+          history_events.each do |event|
+            if event[:type] == 'closed'
+              login = event[:user]
+              user = find_or_create_user(login)
+              check_or_create_membership(project, user) unless user.nil?
+              i.impersonate(user.login) unless user.nil?
+              i.status_id = closed_issue_status.id
+              i.save!
+              i.remove_impersonation
+            end
+            if event[:type] == 'reopened'
+              login = event[:user]
+              user = find_or_create_user(login)
+              check_or_create_membership(project, user) unless user.nil?
+              i.impersonate(user.login) unless user.nil?
+              i.status_id = open_issue_status.id
+              i.save!
+              i.remove_impersonation
+            end
+            if event[:type] == 'comment'
+              comment = event[:comment]
+              login = comment.user.login
+              user = find_or_create_user(login)
+
+              comment_text = clean_pandoc(PandocRuby.convert(convert_code_blocks(comment.body), from: 'markdown_github', to: 'textile'))
+              check_or_create_membership(project, user) unless user.nil?
+              i.impersonate(user.login) unless user.nil?
+              i.notes = comment_text.force_encoding('utf-8')
+              i.save!
+              i.remove_impersonation
             end
           end
         end
@@ -397,22 +428,6 @@ repos.each_page do |page|
             puts "issue error #{i.errors.full_messages}"
           end
           i.remove_impersonation
-          if ci.comments > 0
-            github.issues.comments.list(user: ORGANIZATION, repo: name, issue_id: ci.number).each_page do |page|
-              page.each do |comment|
-                login = comment.user.login
-                user = find_or_create_user(login)
-
-                comment_text = clean_pandoc(PandocRuby.convert(convert_code_blocks(comment.body), from: 'markdown_github', to: 'textile'))
-                check_or_create_membership(project, user) unless user.nil?
-                i.impersonate(user.login) unless user.nil?
-                i.notes = comment_text.force_encoding('utf-8')
-                i.save!
-                i.remove_impersonation
-              end
-            end
-          end
-          i.notes = ''
           if CLOSE_DATE != 'none'
             if CLOSE_DATE == 'due_date'
               i.due_date = Date.parse(ci.closed_at).to_s
@@ -426,9 +441,51 @@ repos.each_page do |page|
               end
             end
           end
-          i.remove_impersonation
-          i.status_id = closed_issue_status.id
-          i.save!
+          history_events = []
+          github.issues.events.list(user: ORGANIZATION, repo: name, issue_id: ci.number).each_page do |page|
+            page.each do |event|
+              history_events << {type: event.event, user: event.actor.login, date: Time.parse(event.created_at)} if ['closed', 'reopened'].include? event.event
+            end
+          end
+          if ci.comments > 0
+            github.issues.comments.list(user: ORGANIZATION, repo: name, issue_id: ci.number).each_page do |page|
+              page.each do |comment|
+                history_events << {type: 'comment', date: Time.parse(comment.created_at), comment: comment}
+              end
+            end
+          end
+          history_events.sort! {|x,y| x[:date] <=> y[:date]}
+          history_events.each do |event|
+            if event[:type] == 'closed'
+              login = event[:user]
+              user = find_or_create_user(login)
+              check_or_create_membership(project, user) unless user.nil?
+              i.impersonate(user.login) unless user.nil?
+              i.status_id = closed_issue_status.id
+              i.save!
+              i.remove_impersonation
+            end
+            if event[:type] == 'reopened'
+              login = event[:user]
+              user = find_or_create_user(login)
+              check_or_create_membership(project, user) unless user.nil?
+              i.impersonate(user.login) unless user.nil?
+              i.status_id = open_issue_status.id
+              i.save!
+              i.remove_impersonation
+            end
+            if event[:type] == 'comment'
+              comment = event[:comment]
+              login = comment.user.login
+              user = find_or_create_user(login)
+              comment_text = clean_pandoc(PandocRuby.convert(convert_code_blocks(comment.body), from: 'markdown_github', to: 'textile'))
+              check_or_create_membership(project, user) unless user.nil?
+              i.impersonate(user.login) unless user.nil?
+              i.notes = comment_text.force_encoding('utf-8')
+              i.save!
+              i.remove_impersonation
+            end
+          end
         end
       end
       closed_versions.each do |cv|
