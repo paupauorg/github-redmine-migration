@@ -3,7 +3,7 @@ require 'rubygems'
 gem 'activeresource', '~> 3.2.12'
 require 'active_resource'
 require 'github_api'
-require 'pandoc-ruby.rb'
+require_relative 'pandoc-ruby'
 require 'yaml'
 
 config = YAML.load_file('config.yml')
