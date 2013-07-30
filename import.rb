@@ -351,7 +351,9 @@ repos.each_page do |page|
               check_or_create_membership(project, user) unless user.nil?
               i.impersonate(user.login) unless user.nil?
               i.status_id = closed_issue_status.id
-              i.save!
+              unless i.save
+                puts "issue error #{i.errors.full_messages}"
+              end
               i.remove_impersonation
             end
             if event[:type] == 'reopened'
@@ -360,7 +362,9 @@ repos.each_page do |page|
               check_or_create_membership(project, user) unless user.nil?
               i.impersonate(user.login) unless user.nil?
               i.status_id = open_issue_status.id
-              i.save!
+              unless i.save
+                puts "issue error #{i.errors.full_messages}"
+              end
               i.remove_impersonation
             end
             if event[:type] == 'comment'
@@ -372,7 +376,9 @@ repos.each_page do |page|
               check_or_create_membership(project, user) unless user.nil?
               i.impersonate(user.login) unless user.nil?
               i.notes = comment_text.force_encoding('utf-8')
-              i.save!
+              unless i.save
+                puts "issue error #{i.errors.full_messages}"
+              end
               i.remove_impersonation
             end
           end
@@ -383,6 +389,10 @@ repos.each_page do |page|
         page.each do |ci|
           description_text = "#{clean_pandoc(PandocRuby.convert(convert_code_blocks(ci.body), from: 'markdown_github', to: 'textile'))} \n--------------------------------------------------
 \nGithub url: #{ci.html_url}"
+          con = MyConn.new Issue.site, Issue.format
+          con.user = Issue.user
+          con.password = Issue.password
+          Issue.connection = con
           i = Issue.new project_id: project.id, status_id: open_issue_status.id, priority_id: normal_priority.id, subject: ci.title, tracker_id: tracker.id,
                         description: description_text.force_encoding('utf-8'), start_date: Time.parse(ci.created_at).to_date.to_s, closed_on: Time.parse(ci.closed_at).to_s
 
@@ -462,7 +472,10 @@ repos.each_page do |page|
               check_or_create_membership(project, user) unless user.nil?
               i.impersonate(user.login) unless user.nil?
               i.status_id = closed_issue_status.id
-              i.save!
+              unless i.save
+                puts "issue error #{i.errors.full_messages}"
+                puts con.last_resp.body.inspect
+              end
               i.remove_impersonation
             end
             if event[:type] == 'reopened'
@@ -471,7 +484,10 @@ repos.each_page do |page|
               check_or_create_membership(project, user) unless user.nil?
               i.impersonate(user.login) unless user.nil?
               i.status_id = open_issue_status.id
-              i.save!
+              unless i.save
+                puts "issue error #{i.errors.full_messages}"
+                puts con.last_resp.body.inspect
+              end
               i.remove_impersonation
             end
             if event[:type] == 'comment'
@@ -482,7 +498,10 @@ repos.each_page do |page|
               check_or_create_membership(project, user) unless user.nil?
               i.impersonate(user.login) unless user.nil?
               i.notes = comment_text.force_encoding('utf-8')
-              i.save!
+              unless i.save
+                puts "issue error #{i.errors.full_messages}"
+                puts con.last_resp.body.inspect
+              end
               i.remove_impersonation
             end
           end
