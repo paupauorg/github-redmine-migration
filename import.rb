@@ -20,6 +20,7 @@ open_issue_status_name = config['OPEN_ISSUE_STATUS_NAME']
 closed_issue_status_name = config['CLOSED_ISSUE_STATUS_NAME']
 default_priority_name = config['DEFAULT_PRIORITY_NAME']
 default_role_name = config['DEFAULT_ROLE']
+DEFAULT_TRACKER = config['DEFAULT_TRACKER']
 
 class MyConn < ActiveResource::Connection
 
@@ -278,11 +279,16 @@ repos.each_page do |page|
       project  = Project.find(project.id, params: {include: 'trackers'})
       memberships = Membership.find(:all, params: {project_id: project.id})
       add_members_to_project_mapping(project, memberships)
-      puts "Available trackers: #{tracker_names}"
-      puts "Select tracker: - (Feature)"
-      tracker_name = gets.chomp
-      tracker_name = 'Feature' if tracker_name == ''
-      tracker = find_tracker(tracker_name)
+      tracker = nil
+      if DEFAULT_TRACKER == '' || DEFAULT_TRACKER.nil?
+        puts "Available trackers: #{tracker_names}"
+        puts "Select tracker: - (Feature)"
+        tracker_name = gets.chomp
+        tracker_name = 'Feature' if tracker_name == ''
+        tracker = find_tracker(tracker_name)
+      else
+        tracker = find_tracker(DEFAULT_TRACKER)
+      end
       if !project.trackers.include?(tracker)
         puts "saving tracker"
         project.trackers << tracker
