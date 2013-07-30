@@ -10,4 +10,6 @@ DEFAULT_ROLE:
 DEFAULT_TRACKER:
 REPOSITORY_FILTER:
                     - repository_name_leave
+USER_MAPPING:
+  github_login: redmine_login
 

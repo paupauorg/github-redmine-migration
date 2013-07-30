@@ -21,6 +21,8 @@ closed_issue_status_name = config['CLOSED_ISSUE_STATUS_NAME']
 default_priority_name = config['DEFAULT_PRIORITY_NAME']
 default_role_name = config['DEFAULT_ROLE']
 DEFAULT_TRACKER = config['DEFAULT_TRACKER']
+user_map = config['USER_MAPPING']
+
 
 class MyConn < ActiveResource::Connection
 
@@ -219,6 +221,11 @@ def find_or_create_user(github_login)
   end
   user
 end
+
+user_map.each do |git , redmine|
+  set_user_mapping redmine.upcase, git.upcase
+end
+
 
 def check_or_create_membership(project, user)
   $project_memberships[project.id] = [] unless $project_memberships.has_key? project.id
