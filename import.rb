@@ -6,6 +6,9 @@ require 'github_api'
 require_relative 'pandoc-ruby'
 require 'yaml'
 
+
+start_time = Time.now
+
 config = YAML.load_file('config.yml')
 REDMINE_SITE = config['REDMINE_SITE']
 REDMINE_TOKEN = config['REDMINE_TOKEN']
@@ -236,6 +239,8 @@ end
 tracker_names = $trackers.collect { |t| t.name }
 $user_names = $users.collect { |u| u.login }
 puts "Only processing #{REPOSITORY_FILTER}" unless REPOSITORY_FILTER.nil? || REPOSITORY_FILTER == []
+total_issue = 0
+total_projects = 0
 project_names = $redmine_projects.collect { |p| p.name }
 repos.each_page do |page|
   page.each do |repo|
@@ -255,6 +260,7 @@ repos.each_page do |page|
       puts "Skipping #{name}"
     else
       project = find_project(redmine_project)
+      total_projects += 1
       if project.nil?
         puts "creating #{redmine_project} project"
         project = Project.new(name: redmine_project, identifier: redmine_project)
@@ -385,6 +391,7 @@ repos.each_page do |page|
           puts "Saved open issue #{count} out of #{open_issues.size}"
         end
       end
+      total_issue += count
       puts "Processing closed issues"
       count = 0
       closed_issues.each_page do |page|
@@ -509,6 +516,7 @@ repos.each_page do |page|
           puts "Saved closed issue #{count} out of #{closed_issues.size}"
         end
       end
+      total_issue += count
       closed_versions.each do |cv|
         version = UpdateVersion.find(cv.id)
         version.status = 'closed'
@@ -518,3 +526,13 @@ repos.each_page do |page|
     end
   end
 end
+
+interval = (Time.now - start_time).to_i
+seconds = interval % 60
+minutes = (interval / 60) % 60
+hours = ((interval / 60) / 60 ) % 60
+seconds = "0#{seconds}" if seconds < 10
+minutes = "0#{minutes}" if minutes < 10
+hours = "0#{hours}" if hours < 10
+puts "Import took #{hours}:#{minutes}:#{seconds}"
+puts "Imported #{total_issue} issues across #{total_projects} projects"
