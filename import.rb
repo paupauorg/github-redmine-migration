@@ -1,6 +1,7 @@
 #encoding: utf-8
 require 'rubygems'
 gem 'activeresource', '~> 3.2.12'
+require 'active_support/core_ext'
 require 'active_resource'
 require 'github_api'
 require_relative 'pandoc-ruby'
@@ -33,6 +34,19 @@ class MyConn < ActiveResource::Connection
   end
 end
 
+def upload_image(filename)
+  token = nil
+  url = URI.parse "#{REDMINE_SITE}/uploads.xml"
+  http = Net::HTTP.new(url.host,url.port)
+  req = Net::HTTP::Post.new(url.path, initheader = {'Content-Type' =>'application/octet-stream'})
+  req.basic_auth(REDMINE_TOKEN, 'nothing')
+  req.body = File.read("images/#{filename}")
+  response = http.request(req)
+  if response.code == '201'
+    token = Hash.from_xml(response.body)[:uploads][:token]
+  end
+  token
+end
 
 class Issue < ActiveResource::Base
   class << self
