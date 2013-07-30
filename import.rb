@@ -203,6 +203,7 @@ def convert_code_blocks(block)
     i += 1
     i % 2  == 0 ? '<pre><code>' : '</code></pre>'
   end
+  x = x.gsub('#', ' #')
   x
 end
 
