@@ -134,6 +134,7 @@ github = Github.new do |config|
   config.oauth_token = GITHUB_TOKEN
   config.adapter     = :net_http
   config.ssl         = {:verify => false}
+  config.auto_pagination    = true
 end
 
 $user_mapping = {}
@@ -250,292 +251,278 @@ puts "Only processing #{REPOSITORY_FILTER}" unless REPOSITORY_FILTER.nil? || REP
 total_issue = 0
 total_projects = 0
 project_names = $redmine_projects.collect { |p| p.name }
-repos.each_page do |page|
-  page.each do |repo|
-    name = repo.name
-    next if REPOSITORY_FILTER.size > 0 && !REPOSITORY_FILTER.include?(repo.name)
-    puts "Processing Repo #{name}"
-    open_issues = github.issues.list(user: ORGANIZATION, repo: name)
-    puts "#{open_issues.size} open issues"
-    closed_issues = github.issues.list(user: ORGANIZATION, repo: name, state: 'closed')
-    puts "#{closed_issues.size} closed issues"
-    puts "Enter name of Redmine project - type 'skip' to skip - (#{name})"
-    puts "Available projects #{project_names}"
-    redmine_project = gets.chomp
-    redmine_project = name if redmine_project == ''
-    closed_versions = []
-    if redmine_project == 'skip'
-      puts "Skipping #{name}"
+repos.each do |repo|
+  name = repo.name
+  next if REPOSITORY_FILTER.size > 0 && !REPOSITORY_FILTER.include?(repo.name)
+  puts "Processing Repo #{name}"
+  open_issues = github.issues.list(user: ORGANIZATION, repo: name)
+  puts "#{open_issues.size} open issues"
+  closed_issues = github.issues.list(user: ORGANIZATION, repo: name, state: 'closed')
+  puts "#{closed_issues.size} closed issues"
+  puts "Enter name of Redmine project - type 'skip' to skip - (#{name})"
+  puts "Available projects #{project_names}"
+  redmine_project = gets.chomp
+  redmine_project = name if redmine_project == ''
+  closed_versions = []
+  if redmine_project == 'skip'
+    puts "Skipping #{name}"
+  else
+    project = find_project(redmine_project)
+    total_projects += 1
+    if project.nil?
+      puts "creating #{redmine_project} project"
+      project = Project.new(name: redmine_project, identifier: redmine_project)
+      if project.save
+        puts "project saved"
+      else
+        puts "project error #{project.errors.full_messages}"
+        abort("Cannot continue")
+      end
     else
-      project = find_project(redmine_project)
-      total_projects += 1
-      if project.nil?
-        puts "creating #{redmine_project} project"
-        project = Project.new(name: redmine_project, identifier: redmine_project)
-        if project.save
-          puts "project saved"
-        else
-          puts "project error #{project.errors.full_messages}"
-          abort("Cannot continue")
-        end
-      else
-        puts "Project exists"
-      end
-      $redmine_projects = Project.find(:all, params: { limit: 100 })
+      puts "Project exists"
+    end
+    $redmine_projects = Project.find(:all, params: { limit: 100 })
 
-      project  = Project.find(project.id, params: {include: 'trackers'})
-      memberships = Membership.find(:all, params: {project_id: project.id})
-      add_members_to_project_mapping(project, memberships)
-      tracker = nil
-      if DEFAULT_TRACKER == '' || DEFAULT_TRACKER.nil?
-        puts "Available trackers: #{tracker_names}"
-        puts "Select tracker: - (Feature)"
-        tracker_name = gets.chomp
-        tracker_name = 'Feature' if tracker_name == ''
-        tracker = find_tracker(tracker_name)
-      else
-        tracker = find_tracker(DEFAULT_TRACKER)
-      end
-      if !project.trackers.include?(tracker)
-        puts "saving tracker"
-        project.trackers << tracker
-        project.tracker_ids = project.trackers.collect {|t| t.id}
-        project.save
-      end
-      puts "Processing open issues"
-      count = 0
-      open_issues.each_page do |page|
-        page.each do |oi|
-          description_text = "#{clean_pandoc(PandocRuby.convert(convert_code_blocks(oi.body), from: 'markdown_github', to: 'textile'))} \n--------------------------------------------------
+    project  = Project.find(project.id, params: {include: 'trackers'})
+    memberships = Membership.find(:all, params: {project_id: project.id})
+    add_members_to_project_mapping(project, memberships)
+    tracker = nil
+    if DEFAULT_TRACKER == '' || DEFAULT_TRACKER.nil?
+      puts "Available trackers: #{tracker_names}"
+      puts "Select tracker: - (Feature)"
+      tracker_name = gets.chomp
+      tracker_name = 'Feature' if tracker_name == ''
+      tracker = find_tracker(tracker_name)
+    else
+      tracker = find_tracker(DEFAULT_TRACKER)
+    end
+    if !project.trackers.include?(tracker)
+      puts "saving tracker"
+      project.trackers << tracker
+      project.tracker_ids = project.trackers.collect {|t| t.id}
+      project.save
+    end
+    puts "Processing open issues"
+    count = 0
+    open_issues.each do |oi|
+      description_text = "#{clean_pandoc(PandocRuby.convert(convert_code_blocks(oi.body), from: 'markdown_github', to: 'textile'))} \n--------------------------------------------------
 \nGithub url: #{oi.html_url}"
-          i = Issue.new project_id: project.id, status_id: open_issue_status.id, priority_id: normal_priority.id, subject: oi.title,
-                    description: description_text.force_encoding('utf-8'), start_date: Time.parse(oi.created_at).to_date.to_s, tracker_id: tracker.id
+      i = Issue.new project_id: project.id, status_id: open_issue_status.id, priority_id: normal_priority.id, subject: oi.title,
+                description: description_text.force_encoding('utf-8'), start_date: Time.parse(oi.created_at).to_date.to_s, tracker_id: tracker.id
 
-          versions = Version.find(:all, :params => {project_id: project.id, limit: 100 })
+      versions = Version.find(:all, :params => {project_id: project.id, limit: 100 })
 
-          if !oi.milestone.nil?
-            version = versions.find { |v| v.name.upcase == oi.milestone.title.upcase } unless versions.nil?
-            if version.nil?
-              version = Version.new name: oi.milestone.title, status: 'open', project_id: project.id
-              version.effective_date = Date.parse(oi.milestone.due_on).to_s unless oi.milestone.due_on.nil?
-              version.save!
-              closed_versions << version if oi.milestone.state == 'closed'
-              puts "versions saved"
-            elsif version.status == 'closed'
-              ver = UpdateVersion.find(version.id)
-              ver.status = 'open'
-              ver.save!
-              closed_versions << ver
-            end
-            i.fixed_version_id = version.id
-          end
+      if !oi.milestone.nil?
+        version = versions.find { |v| v.name.upcase == oi.milestone.title.upcase } unless versions.nil?
+        if version.nil?
+          version = Version.new name: oi.milestone.title, status: 'open', project_id: project.id
+          version.effective_date = Date.parse(oi.milestone.due_on).to_s unless oi.milestone.due_on.nil?
+          version.save!
+          closed_versions << version if oi.milestone.state == 'closed'
+          puts "versions saved"
+        elsif version.status == 'closed'
+          ver = UpdateVersion.find(version.id)
+          ver.status = 'open'
+          ver.save!
+          closed_versions << ver
+        end
+        i.fixed_version_id = version.id
+      end
 
-          if !oi.labels.nil? && !oi.labels.empty?
-            i.description += "\nNotes: #{oi.labels.collect {|label| label.name }.to_s}"
-          end
-          if !oi.user.nil?
-            login = oi.user.login
-            user = find_or_create_user(login)
-            check_or_create_membership(project, user) unless user.nil?
-            i.impersonate(user.login) unless user.nil?
-          end
-          if !oi.assignee.nil?
-           login = oi.assignee.login
-           user = find_or_create_user(login)
-           i.assigned_to_id = user.id unless user.nil?
-          end
+      if !oi.labels.nil? && !oi.labels.empty?
+        i.description += "\nNotes: #{oi.labels.collect {|label| label.name }.to_s}"
+      end
+      if !oi.user.nil?
+        login = oi.user.login
+        user = find_or_create_user(login)
+        check_or_create_membership(project, user) unless user.nil?
+        i.impersonate(user.login) unless user.nil?
+      end
+      if !oi.assignee.nil?
+       login = oi.assignee.login
+       user = find_or_create_user(login)
+       i.assigned_to_id = user.id unless user.nil?
+      end
+      unless i.save
+        puts "issue error #{i.errors.full_messages}"
+      end
+      i.remove_impersonation
+      history_events = []
+      github.issues.events.list(user: ORGANIZATION, repo: name, issue_id: oi.number).each do |event|
+        history_events << {type: event.event, user: event.actor.login, date: Time.parse(event.created_at)} if ['closed', 'reopened'].include? event.event
+      end
+      if oi.comments > 0
+        github.issues.comments.list(user: ORGANIZATION, repo: name, issue_id: oi.number).each do |comment|
+          history_events << {type: 'comment', date: Time.parse(comment.created_at), comment: comment}
+        end
+      end
+      history_events.sort! {|x,y| x[:date] <=> y[:date]}
+      history_events.each do |event|
+        if event[:type] == 'closed'
+          login = event[:user]
+          user = find_or_create_user(login)
+          check_or_create_membership(project, user) unless user.nil?
+          i.impersonate(user.login) unless user.nil?
+          i.status_id = closed_issue_status.id
           unless i.save
             puts "issue error #{i.errors.full_messages}"
           end
           i.remove_impersonation
-          history_events = []
-          github.issues.events.list(user: ORGANIZATION, repo: name, issue_id: oi.number).each_page do |page|
-            page.each do |event|
-              history_events << {type: event.event, user: event.actor.login, date: Time.parse(event.created_at)} if ['closed', 'reopened'].include? event.event
-            end
+        end
+        if event[:type] == 'reopened'
+          login = event[:user]
+          user = find_or_create_user(login)
+          check_or_create_membership(project, user) unless user.nil?
+          i.impersonate(user.login) unless user.nil?
+          i.status_id = open_issue_status.id
+          unless i.save
+            puts "issue error #{i.errors.full_messages}"
           end
-          if oi.comments > 0
-            github.issues.comments.list(user: ORGANIZATION, repo: name, issue_id: oi.number).each_page do |page|
-              page.each do |comment|
-                history_events << {type: 'comment', date: Time.parse(comment.created_at), comment: comment}
-              end
-            end
-          end
-          history_events.sort! {|x,y| x[:date] <=> y[:date]}
-          history_events.each do |event|
-            if event[:type] == 'closed'
-              login = event[:user]
-              user = find_or_create_user(login)
-              check_or_create_membership(project, user) unless user.nil?
-              i.impersonate(user.login) unless user.nil?
-              i.status_id = closed_issue_status.id
-              unless i.save
-                puts "issue error #{i.errors.full_messages}"
-              end
-              i.remove_impersonation
-            end
-            if event[:type] == 'reopened'
-              login = event[:user]
-              user = find_or_create_user(login)
-              check_or_create_membership(project, user) unless user.nil?
-              i.impersonate(user.login) unless user.nil?
-              i.status_id = open_issue_status.id
-              unless i.save
-                puts "issue error #{i.errors.full_messages}"
-              end
-              i.remove_impersonation
-            end
-            if event[:type] == 'comment'
-              comment = event[:comment]
-              login = comment.user.login
-              user = find_or_create_user(login)
+          i.remove_impersonation
+        end
+        if event[:type] == 'comment'
+          comment = event[:comment]
+          login = comment.user.login
+          user = find_or_create_user(login)
 
-              comment_text = clean_pandoc(PandocRuby.convert(convert_code_blocks(comment.body), from: 'markdown_github', to: 'textile'))
-              check_or_create_membership(project, user) unless user.nil?
-              i.impersonate(user.login) unless user.nil?
-              i.notes = comment_text.force_encoding('utf-8')
-              unless i.save
-                puts "issue error #{i.errors.full_messages}"
-              end
-              i.remove_impersonation
-            end
+          comment_text = clean_pandoc(PandocRuby.convert(convert_code_blocks(comment.body), from: 'markdown_github', to: 'textile'))
+          check_or_create_membership(project, user) unless user.nil?
+          i.impersonate(user.login) unless user.nil?
+          i.notes = comment_text.force_encoding('utf-8')
+          unless i.save
+            puts "issue error #{i.errors.full_messages}"
           end
-          count += 1
-          puts "Saved open issue #{count} out of #{open_issues.size}"
+          i.remove_impersonation
         end
       end
-      total_issue += count
-      puts "Processing closed issues"
-      count = 0
-      closed_issues.each_page do |page|
-        page.each do |ci|
-          description_text = "#{clean_pandoc(PandocRuby.convert(convert_code_blocks(ci.body), from: 'markdown_github', to: 'textile'))} \n--------------------------------------------------
+      count += 1
+      puts "Saved open issue #{count} out of #{open_issues.size}"
+    end
+    total_issue += count
+    puts "Processing closed issues"
+    count = 0
+    closed_issues.each do |ci|
+      description_text = "#{clean_pandoc(PandocRuby.convert(convert_code_blocks(ci.body), from: 'markdown_github', to: 'textile'))} \n--------------------------------------------------
 \nGithub url: #{ci.html_url}"
-          con = MyConn.new Issue.site, Issue.format
-          con.user = Issue.user
-          con.password = Issue.password
-          Issue.connection = con
-          i = Issue.new project_id: project.id, status_id: open_issue_status.id, priority_id: normal_priority.id, subject: ci.title, tracker_id: tracker.id,
-                        description: description_text.force_encoding('utf-8'), start_date: Time.parse(ci.created_at).to_date.to_s, closed_on: Time.parse(ci.closed_at).to_s
+      con = MyConn.new Issue.site, Issue.format
+      con.user = Issue.user
+      con.password = Issue.password
+      Issue.connection = con
+      i = Issue.new project_id: project.id, status_id: open_issue_status.id, priority_id: normal_priority.id, subject: ci.title, tracker_id: tracker.id,
+                    description: description_text.force_encoding('utf-8'), start_date: Time.parse(ci.created_at).to_date.to_s, closed_on: Time.parse(ci.closed_at).to_s
 
-          versions = Version.find(:all, :params => {:project_id => project.id})
+      versions = Version.find(:all, :params => {:project_id => project.id})
 
-          if !ci.milestone.nil?
-            version = versions.find { |v| v.name.upcase == ci.milestone.title.upcase } unless versions.nil?
-            if version.nil?
-              version = Version.new name: ci.milestone.title, status: 'open', project_id: project.id
-              version.effective_date = Date.parse(ci.milestone.due_on).to_s unless ci.milestone.due_on.nil?
-              version.save!
-              closed_versions << version if ci.milestone.state == 'closed'
-            elsif version.status == 'closed'
-              ver = UpdateVersion.find(version.id)
-              ver.status = 'open'
-              ver.save!
-              closed_versions << ver
-            end
-            i.fixed_version_id = version.id
-          end
+      if !ci.milestone.nil?
+        version = versions.find { |v| v.name.upcase == ci.milestone.title.upcase } unless versions.nil?
+        if version.nil?
+          version = Version.new name: ci.milestone.title, status: 'open', project_id: project.id
+          version.effective_date = Date.parse(ci.milestone.due_on).to_s unless ci.milestone.due_on.nil?
+          version.save!
+          closed_versions << version if ci.milestone.state == 'closed'
+        elsif version.status == 'closed'
+          ver = UpdateVersion.find(version.id)
+          ver.status = 'open'
+          ver.save!
+          closed_versions << ver
+        end
+        i.fixed_version_id = version.id
+      end
 
 
-          if !ci.labels.nil? && !ci.labels.empty?
-            i.description += "\nNotes: #{ci.labels.collect {|label| label.name }.to_s}"
-          end
-          if !ci.user.nil?
-            login = ci.user.login
-            user = find_or_create_user(login)
+      if !ci.labels.nil? && !ci.labels.empty?
+        i.description += "\nNotes: #{ci.labels.collect {|label| label.name }.to_s}"
+      end
+      if !ci.user.nil?
+        login = ci.user.login
+        user = find_or_create_user(login)
 
-            check_or_create_membership(project, user) unless user.nil?
-            i.impersonate(user.login) unless user.nil?
-          end
-          if !ci.assignee.nil?
-            login = ci.assignee.login
-            user = find_or_create_user(login)
+        check_or_create_membership(project, user) unless user.nil?
+        i.impersonate(user.login) unless user.nil?
+      end
+      if !ci.assignee.nil?
+        login = ci.assignee.login
+        user = find_or_create_user(login)
 
-            i.assigned_to_id = user.id unless user.nil?
-          end
+        i.assigned_to_id = user.id unless user.nil?
+      end
 
-          unless i.save
-            puts "issue error #{i.errors.full_messages}"
-          end
-          i.remove_impersonation
-          if CLOSE_DATE != 'none'
-            if CLOSE_DATE == 'due_date'
-              i.due_date = Date.parse(ci.closed_at).to_s
-            else
-              if i.respond_to? :custom_fields
-                date_field =  i.custom_fields.find_index {|field| field.name.upcase == CLOSE_DATE.upcase }
-                if !date_field.nil?
-                  i.custom_fields[date_field].value = Date.parse(ci.closed_at).to_s
-                  i.save!
-                end
-              end
+      unless i.save
+        puts "issue error #{i.errors.full_messages}"
+      end
+      i.remove_impersonation
+      if CLOSE_DATE != 'none'
+        if CLOSE_DATE == 'due_date'
+          i.due_date = Date.parse(ci.closed_at).to_s
+        else
+          if i.respond_to? :custom_fields
+            date_field =  i.custom_fields.find_index {|field| field.name.upcase == CLOSE_DATE.upcase }
+            if !date_field.nil?
+              i.custom_fields[date_field].value = Date.parse(ci.closed_at).to_s
+              i.save!
             end
           end
-          history_events = []
-          github.issues.events.list(user: ORGANIZATION, repo: name, issue_id: ci.number).each_page do |page|
-            page.each do |event|
-              history_events << {type: event.event, user: event.actor.login, date: Time.parse(event.created_at)} if ['closed', 'reopened'].include? event.event
-            end
-          end
-          if ci.comments > 0
-            github.issues.comments.list(user: ORGANIZATION, repo: name, issue_id: ci.number).each_page do |page|
-              page.each do |comment|
-                history_events << {type: 'comment', date: Time.parse(comment.created_at), comment: comment}
-              end
-            end
-          end
-          history_events.sort! {|x,y| x[:date] <=> y[:date]}
-          history_events.each do |event|
-            if event[:type] == 'closed'
-              login = event[:user]
-              user = find_or_create_user(login)
-              check_or_create_membership(project, user) unless user.nil?
-              i.impersonate(user.login) unless user.nil?
-              i.status_id = closed_issue_status.id
-              unless i.save
-                puts "issue error #{i.errors.full_messages}"
-                puts con.last_resp.body.inspect
-              end
-              i.remove_impersonation
-            end
-            if event[:type] == 'reopened'
-              login = event[:user]
-              user = find_or_create_user(login)
-              check_or_create_membership(project, user) unless user.nil?
-              i.impersonate(user.login) unless user.nil?
-              i.status_id = open_issue_status.id
-              unless i.save
-                puts "issue error #{i.errors.full_messages}"
-                puts con.last_resp.body.inspect
-              end
-              i.remove_impersonation
-            end
-            if event[:type] == 'comment'
-              comment = event[:comment]
-              login = comment.user.login
-              user = find_or_create_user(login)
-              comment_text = clean_pandoc(PandocRuby.convert(convert_code_blocks(comment.body), from: 'markdown_github', to: 'textile'))
-              check_or_create_membership(project, user) unless user.nil?
-              i.impersonate(user.login) unless user.nil?
-              i.notes = comment_text.force_encoding('utf-8')
-              unless i.save
-                puts "issue error #{i.errors.full_messages}"
-                puts con.last_resp.body.inspect
-              end
-              i.remove_impersonation
-            end
-          end
-          count += 1
-          puts "Saved closed issue #{count} out of #{closed_issues.size}"
         end
       end
-      total_issue += count
-      closed_versions.each do |cv|
-        version = UpdateVersion.find(cv.id)
-        version.status = 'closed'
-        version.project_id = project.id
-        version.save!
+      history_events = []
+      github.issues.events.list(user: ORGANIZATION, repo: name, issue_id: ci.number).each do |event|
+        history_events << {type: event.event, user: event.actor.login, date: Time.parse(event.created_at)} if ['closed', 'reopened'].include? event.event
       end
+      if ci.comments > 0
+        github.issues.comments.list(user: ORGANIZATION, repo: name, issue_id: ci.number).each do |comment|
+          history_events << {type: 'comment', date: Time.parse(comment.created_at), comment: comment}
+        end
+      end
+      history_events.sort! {|x,y| x[:date] <=> y[:date]}
+      history_events.each do |event|
+        if event[:type] == 'closed'
+          login = event[:user]
+          user = find_or_create_user(login)
+          check_or_create_membership(project, user) unless user.nil?
+          i.impersonate(user.login) unless user.nil?
+          i.status_id = closed_issue_status.id
+          unless i.save
+            puts "issue error #{i.errors.full_messages}"
+            puts con.last_resp.body.inspect
+          end
+          i.remove_impersonation
+        end
+        if event[:type] == 'reopened'
+          login = event[:user]
+          user = find_or_create_user(login)
+          check_or_create_membership(project, user) unless user.nil?
+          i.impersonate(user.login) unless user.nil?
+          i.status_id = open_issue_status.id
+          unless i.save
+            puts "issue error #{i.errors.full_messages}"
+            puts con.last_resp.body.inspect
+          end
+          i.remove_impersonation
+        end
+        if event[:type] == 'comment'
+          comment = event[:comment]
+          login = comment.user.login
+          user = find_or_create_user(login)
+          comment_text = clean_pandoc(PandocRuby.convert(convert_code_blocks(comment.body), from: 'markdown_github', to: 'textile'))
+          check_or_create_membership(project, user) unless user.nil?
+          i.impersonate(user.login) unless user.nil?
+          i.notes = comment_text.force_encoding('utf-8')
+          unless i.save
+            puts "issue error #{i.errors.full_messages}"
+            puts con.last_resp.body.inspect
+          end
+          i.remove_impersonation
+        end
+      end
+      count += 1
+      puts "Saved closed issue #{count} out of #{closed_issues.size}"
+    end
+    total_issue += count
+    closed_versions.each do |cv|
+      version = UpdateVersion.find(cv.id)
+      version.status = 'closed'
+      version.project_id = project.id
+      version.save!
     end
   end
 end
