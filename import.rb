@@ -44,6 +44,8 @@ def upload_image(filename)
   response = http.request(req)
   if response.code == '201'
     token = Hash.from_xml(response.body)[:uploads][:token]
+  elsif response.code == '422'
+    puts "File exceeds maximum allowed file size"
   end
   token
 end
