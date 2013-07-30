@@ -284,6 +284,7 @@ repos.each_page do |page|
         project.save
       end
       puts "Processing open issues"
+      count = 0
       open_issues.each_page do |page|
         page.each do |oi|
           description_text = "#{clean_pandoc(PandocRuby.convert(convert_code_blocks(oi.body), from: 'markdown_github', to: 'textile'))} \n--------------------------------------------------
@@ -324,9 +325,7 @@ repos.each_page do |page|
            user = find_or_create_user(login)
            i.assigned_to_id = user.id unless user.nil?
           end
-          if i.save
-            puts "issue saved"
-          else
+          unless i.save
             puts "issue error #{i.errors.full_messages}"
           end
           i.remove_impersonation
@@ -382,9 +381,12 @@ repos.each_page do |page|
               i.remove_impersonation
             end
           end
+          count += 1
+          puts "Saved open issue #{count} out of #{open_issues.size}"
         end
       end
       puts "Processing closed issues"
+      count = 0
       closed_issues.each_page do |page|
         page.each do |ci|
           description_text = "#{clean_pandoc(PandocRuby.convert(convert_code_blocks(ci.body), from: 'markdown_github', to: 'textile'))} \n--------------------------------------------------
@@ -432,9 +434,7 @@ repos.each_page do |page|
             i.assigned_to_id = user.id unless user.nil?
           end
 
-          if i.save!
-            puts "issue saved"
-          else
+          unless i.save
             puts "issue error #{i.errors.full_messages}"
           end
           i.remove_impersonation
@@ -505,6 +505,8 @@ repos.each_page do |page|
               i.remove_impersonation
             end
           end
+          count += 1
+          puts "Saved closed issue #{count} out of #{closed_issues.size}"
         end
       end
       closed_versions.each do |cv|
