@@ -21,8 +21,8 @@ closed_issue_status_name = config['CLOSED_ISSUE_STATUS_NAME']
 default_priority_name = config['DEFAULT_PRIORITY_NAME']
 default_role_name = config['DEFAULT_ROLE']
 DEFAULT_TRACKER = config['DEFAULT_TRACKER']
+IMPORT_IMAGES = config['IMPORT_IMAGES'] == true ? true : false
 user_map = config['USER_MAPPING']
-
 
 class MyConn < ActiveResource::Connection
 
