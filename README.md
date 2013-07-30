@@ -37,4 +37,4 @@ The script will guide you through importing.
 * users must be created before running the script
 * only labels/milestones that have issues will be imported
 * creation and closing dates cannot be set, this applies to notes too.
-
+* you should disable email notifications before running the script if you don't wanted to be flooded with emails
