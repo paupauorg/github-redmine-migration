@@ -22,6 +22,8 @@ You can use the `REPOSITORY_FILTER` array to process only some of the repositori
 
 You can store the issue close date in the due_date by setting `CLOSE_DATE` to `due_date`, you can store it in a custom_field by setting `CLOSE_DATE` to the name of the field or ignore it by setting `CLOSE_DATE` to `none`.
 
+You can choose whether to import images from github by setting IMPORT_IMAGES.
+
 User mapping can be done before running the script by filling the USER_MAPPING hash.
 ### 3. Running the script
 

@@ -6,6 +6,7 @@ require 'active_resource'
 require 'github_api'
 require_relative 'pandoc-ruby'
 require 'yaml'
+require 'open-uri'
 
 
 start_time = Time.now
@@ -43,11 +44,20 @@ def upload_image(filename)
   req.body = File.read("images/#{filename}")
   response = http.request(req)
   if response.code == '201'
-    token = Hash.from_xml(response.body)[:uploads][:token]
+    token = Hash.from_xml(response.body)["upload"]["token"]
   elsif response.code == '422'
     puts "File exceeds maximum allowed file size"
   end
   token
+end
+
+def download_image(filename)
+  url = URI.parse filename
+  local_file = File.basename(url.path)
+  File.open("images/#{local_file}", 'wb') do |file|
+    file.write open(filename).read
+  end
+  local_file
 end
 
 class Issue < ActiveResource::Base
@@ -223,6 +233,12 @@ def convert_code_blocks(block)
   x
 end
 
+def find_images(text)
+  result = text.scan(/(}https?:\/\/.*\.(?:png|jpg))/i)
+  result.each { |a|  a[0][0] = '' } unless result.empty?
+  result
+end
+
 
 def clean_pandoc(block)
   block.gsub('"$":', '').gsub('!http', '!{width: 50%}http')
@@ -261,7 +277,7 @@ def add_members_to_project_mapping(project, memberships)
   $project_memberships[project.id] = [] unless $project_memberships.has_key? project.id
   memberships.each { |membership| $project_memberships[project.id] << membership.user.id }
 end
-
+total_images = 0
 tracker_names = $trackers.collect { |t| t.name }
 $user_names = $users.collect { |u| u.login }
 puts "Only processing #{REPOSITORY_FILTER}" unless REPOSITORY_FILTER.nil? || REPOSITORY_FILTER == []
@@ -324,6 +340,12 @@ repos.each do |repo|
     open_issues.each do |oi|
       description_text = "#{clean_pandoc(PandocRuby.convert(convert_code_blocks(oi.body), from: 'markdown_github', to: 'textile'))} \n--------------------------------------------------
 \nGithub url: #{oi.html_url}"
+      tokens = []
+      if IMPORT_IMAGES
+        find_images(description_text).each do |im|
+          tokens << { token: upload_image(download_image(im[0])), filename: File.basename(im[0]), original: im[0]  }
+        end
+      end
       i = Issue.new project_id: project.id, status_id: open_issue_status.id, priority_id: normal_priority.id, subject: oi.title,
                 description: description_text.force_encoding('utf-8'), start_date: Time.parse(oi.created_at).to_date.to_s, tracker_id: tracker.id
 
@@ -364,6 +386,17 @@ repos.each do |repo|
         puts "issue error #{i.errors.full_messages}"
       end
       i.remove_impersonation
+      unless tokens.empty?
+        i.uploads = tokens
+        i.save!
+        description = i.description
+        tokens.each do |token|
+          description = description.gsub(token[:original], token[:filename])
+        end
+        i.description = description
+        i.save!
+        total_images += tokens.size
+      end
       history_events = []
       github.issues.events.list(user: ORGANIZATION, repo: name, issue_id: oi.number).each do |event|
         history_events << {type: event.event, user: event.actor.login, date: Time.parse(event.created_at)} if ['closed', 'reopened'].include? event.event
@@ -381,6 +414,7 @@ repos.each do |repo|
           check_or_create_membership(project, user) unless user.nil?
           i.impersonate(user.login) unless user.nil?
           i.status_id = closed_issue_status.id
+          i.notes = ''
           unless i.save
             puts "issue error #{i.errors.full_messages}"
           end
@@ -392,6 +426,7 @@ repos.each do |repo|
           check_or_create_membership(project, user) unless user.nil?
           i.impersonate(user.login) unless user.nil?
           i.status_id = open_issue_status.id
+          i.notes = ''
           unless i.save
             puts "issue error #{i.errors.full_messages}"
           end
@@ -403,6 +438,23 @@ repos.each do |repo|
           user = find_or_create_user(login)
 
           comment_text = clean_pandoc(PandocRuby.convert(convert_code_blocks(comment.body), from: 'markdown_github', to: 'textile'))
+          tokens = []
+          if IMPORT_IMAGES
+            find_images(comment_text).each do |im|
+              tokens << { token: upload_image(download_image(im[0])), filename: File.basename(im[0]), original: im[0]  }
+            end
+          end
+          if i.has_key? :uploads
+            i.uploads.merge tokens
+          else
+            i.uploads = tokens
+          end
+          i.notes = ''
+          i.save!
+          tokens.each do |token|
+            comment_text = comment_text.gsub(token[:original], token[:filename])
+          end
+
           check_or_create_membership(project, user) unless user.nil?
           i.impersonate(user.login) unless user.nil?
           i.notes = comment_text.force_encoding('utf-8')
@@ -410,6 +462,7 @@ repos.each do |repo|
             puts "issue error #{i.errors.full_messages}"
           end
           i.remove_impersonation
+          total_images += tokens.size
         end
       end
       count += 1
@@ -421,6 +474,12 @@ repos.each do |repo|
     closed_issues.each do |ci|
       description_text = "#{clean_pandoc(PandocRuby.convert(convert_code_blocks(ci.body), from: 'markdown_github', to: 'textile'))} \n--------------------------------------------------
 \nGithub url: #{ci.html_url}"
+      tokens = []
+      if IMPORT_IMAGES
+        find_images(description_text).each do |im|
+          tokens << { token: upload_image(download_image(im[0])), filename: File.basename(im[0]), original: im[0]  }
+        end
+      end
       con = MyConn.new Issue.site, Issue.format
       con.user = Issue.user
       con.password = Issue.password
@@ -481,6 +540,17 @@ repos.each do |repo|
           end
         end
       end
+      unless tokens.empty?
+        i.uploads = tokens
+        i.save!
+        description = i.description
+        tokens.each do |token|
+          description = description.gsub(token[:original], token[:filename])
+        end
+        i.description = description
+        i.save!
+        total_images += tokens.size
+      end
       history_events = []
       github.issues.events.list(user: ORGANIZATION, repo: name, issue_id: ci.number).each do |event|
         history_events << {type: event.event, user: event.actor.login, date: Time.parse(event.created_at)} if ['closed', 'reopened'].include? event.event
@@ -498,6 +568,7 @@ repos.each do |repo|
           check_or_create_membership(project, user) unless user.nil?
           i.impersonate(user.login) unless user.nil?
           i.status_id = closed_issue_status.id
+          i.notes = ''
           unless i.save
             puts "issue error #{i.errors.full_messages}"
             puts con.last_resp.body.inspect
@@ -510,6 +581,7 @@ repos.each do |repo|
           check_or_create_membership(project, user) unless user.nil?
           i.impersonate(user.login) unless user.nil?
           i.status_id = open_issue_status.id
+          i.notes = ''
           unless i.save
             puts "issue error #{i.errors.full_messages}"
             puts con.last_resp.body.inspect
@@ -521,6 +593,22 @@ repos.each do |repo|
           login = comment.user.login
           user = find_or_create_user(login)
           comment_text = clean_pandoc(PandocRuby.convert(convert_code_blocks(comment.body), from: 'markdown_github', to: 'textile'))
+          tokens = []
+          if IMPORT_IMAGES
+            find_images(comment_text).each do |im|
+              tokens << { token: upload_image(download_image(im[0])), filename: File.basename(im[0]), original: im[0]  }
+            end
+          end
+          if i.has_key? :uploads
+            i.uploads.merge tokens
+          else
+            i.uploads = tokens
+          end
+          i.notes = ''
+          i.save!
+          tokens.each do |token|
+            comment_text = comment_text.gsub(token[:original], token[:filename])
+          end
           check_or_create_membership(project, user) unless user.nil?
           i.impersonate(user.login) unless user.nil?
           i.notes = comment_text.force_encoding('utf-8')
@@ -529,6 +617,7 @@ repos.each do |repo|
             puts con.last_resp.body.inspect
           end
           i.remove_impersonation
+          total_images += tokens.size
         end
       end
       count += 1
@@ -553,3 +642,4 @@ minutes = "0#{minutes}" if minutes < 10
 hours = "0#{hours}" if hours < 10
 puts "Import took #{hours}:#{minutes}:#{seconds}"
 puts "Imported #{total_issue} issues across #{total_projects} projects"
+puts "Uploaded a total of #{total_images} images"
