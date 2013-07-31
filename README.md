@@ -18,11 +18,11 @@ Copy `config.yml.example` to `config.yml` and fill in your Redmine site address,
 
 After doing this, you can run `config_creator.rb` to help you write the config.
 
-The user should be an administrator. And you should have a custom_field called `close_date` with type date, avalailable for all projects.
+The user should be an administrator.
 
 You can use the `REPOSITORY_FILTER` array to process only some of the repositories.
 
-You can store the issue close date in the due_date by setting `CLOSE_DATE` to `due_date`, you can store it in a custom_field by setting `CLOSE_DATE` to the name of the field or ignore it by setting `CLOSE_DATE` to `none`.
+You can store the issue close date in the due_date by setting `CLOSE_DATE` to `due_date`, you can store it in a custom_field, the custom field must be available for all projects, by setting `CLOSE_DATE` to the name of the field or ignore it by setting `CLOSE_DATE` to `none`.
 
 You can choose whether to import images from github by setting IMPORT_IMAGES.
 
