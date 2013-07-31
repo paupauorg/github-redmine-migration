@@ -37,13 +37,14 @@ end
 
 def upload_image(filename)
   token = nil
-  url = URI.parse "#{REDMINE_SITE}/uploads.xml"
-  http = Net::HTTP.new(url.host,url.port)
-  http.use_ssl = (url.scheme == 'https')
-  req = Net::HTTP::Post.new(url.path, initheader = {'Content-Type' =>'application/octet-stream'})
+  url = URI("#{REDMINE_SITE}/uploads.xml")
+  req = Net::HTTP::Post.new(url.path)
   req.basic_auth(REDMINE_TOKEN, 'nothing')
   req.body = File.read("images/#{filename}")
-  response = http.request(req)
+  req.content_type = 'application/octet-stream'
+  response = Net::HTTP.start(url.hostname, url.port, verify_mode: OpenSSL::SSL::VERIFY_NONE, use_ssl: (url.scheme == 'https')) do |http|
+    http.request(req)
+  end
   if response.code == '201'
     token = Hash.from_xml(response.body)["upload"]["token"]
   elsif response.code == '422'
