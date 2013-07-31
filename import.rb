@@ -48,6 +48,7 @@ def upload_image(filename)
   end
   if response.code == '201'
     token = Hash.from_xml(response.body)["upload"]["token"]
+    File.delete("images/#{filename}")
   elsif response.code == '422'
     puts "File exceeds maximum allowed file size"
   end
