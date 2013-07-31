@@ -11,6 +11,8 @@ REDMINE_SITE = config['REDMINE_SITE']
 REDMINE_TOKEN = config['REDMINE_TOKEN']
 ORGANIZATION  = config['ORGANIZATION']
 GITHUB_TOKEN = config['GITHUB_TOKEN']
+REPOSITORY_FILTER = config['REPOSITORY_FILTER'] || []
+
 
 github = Github.new do |config|
   config.endpoint    = 'https://api.github.com'
@@ -109,6 +111,8 @@ def process_user(login)
 end
 
 repos.each do |repo|
+  next if REPOSITORY_FILTER.size > 0 && !REPOSITORY_FILTER.include?(repo.name)
+  puts "Processing repository: #{repo.name}"
   issues = github.issues.list(user: ORGANIZATION, repo: repo.name).to_a
   issues = issues | github.issues.list(user: ORGANIZATION, repo: repo.name, state: 'closed').to_a
   issues.each do |is|
@@ -136,7 +140,8 @@ config = {
     'DEFAULT_ROLE' => default_role_name,
     'DEFAULT_TRACKER' => tracker_name,
     'IMPORT_IMAGES' => import_images,
-    'USER_MAPPING' => $user_mapping
+    'USER_MAPPING' => $user_mapping,
+    'REPOSITORY_FILTER' => REPOSITORY_FILTER
 }
 
 File.open('generate.config.yml', 'w') {|f| f.write(config.to_yaml)}
