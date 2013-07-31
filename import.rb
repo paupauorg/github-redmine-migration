@@ -36,6 +36,7 @@ class MyConn < ActiveResource::Connection
 end
 
 def upload_image(filename)
+  return nil if filename.nil? || filename == ''
   token = nil
   url = URI("#{REDMINE_SITE}/uploads.xml")
   req = Net::HTTP::Post.new(url.path)
@@ -56,8 +57,12 @@ end
 def download_image(filename)
   url = URI.parse filename
   local_file = File.basename(url.path)
+  begin
   File.open("images/#{local_file}", 'wb') do |file|
     file.write open(filename).read
+  end
+  rescue OpenURI::HTTPError
+    local_file = nil
   end
   local_file
 end
@@ -279,6 +284,7 @@ def add_members_to_project_mapping(project, memberships)
   $project_memberships[project.id] = [] unless $project_memberships.has_key? project.id
   memberships.each { |membership| $project_memberships[project.id] << membership.user.id }
 end
+
 total_images = 0
 tracker_names = $trackers.collect { |t| t.name }
 $user_names = $users.collect { |u| u.login }
@@ -345,7 +351,8 @@ repos.each do |repo|
       tokens = []
       if IMPORT_IMAGES
         find_images(description_text).each do |im|
-          tokens << { token: upload_image(download_image(im[0])), filename: File.basename(im[0]), original: im[0]  }
+          token = upload_image(download_image(im[0]))
+          tokens << { token: token, filename: File.basename(im[0]), original: im[0]  } unless token.nil?
         end
       end
       i = Issue.new project_id: project.id, status_id: open_issue_status.id, priority_id: normal_priority.id, subject: oi.title,
@@ -443,7 +450,8 @@ repos.each do |repo|
           tokens = []
           if IMPORT_IMAGES
             find_images(comment_text).each do |im|
-              tokens << { token: upload_image(download_image(im[0])), filename: File.basename(im[0]), original: im[0]  }
+              token = upload_image(download_image(im[0]))
+              tokens << { token: token, filename: File.basename(im[0]), original: im[0]  } unless token.nil?
             end
           end
           if i.has_key? :uploads
@@ -479,7 +487,8 @@ repos.each do |repo|
       tokens = []
       if IMPORT_IMAGES
         find_images(description_text).each do |im|
-          tokens << { token: upload_image(download_image(im[0])), filename: File.basename(im[0]), original: im[0]  }
+          token = upload_image(download_image(im[0]))
+          tokens << { token: token, filename: File.basename(im[0]), original: im[0]  } unless token.nil?
         end
       end
       con = MyConn.new Issue.site, Issue.format
@@ -598,7 +607,8 @@ repos.each do |repo|
           tokens = []
           if IMPORT_IMAGES
             find_images(comment_text).each do |im|
-              tokens << { token: upload_image(download_image(im[0])), filename: File.basename(im[0]), original: im[0]  }
+              token = upload_image(download_image(im[0]))
+              tokens << { token: token, filename: File.basename(im[0]), original: im[0]  } unless token.nil?
             end
           end
           if i.has_key? :uploads
