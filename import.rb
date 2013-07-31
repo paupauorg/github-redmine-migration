@@ -39,6 +39,7 @@ def upload_image(filename)
   token = nil
   url = URI.parse "#{REDMINE_SITE}/uploads.xml"
   http = Net::HTTP.new(url.host,url.port)
+  http.use_ssl = (url.scheme == 'https')
   req = Net::HTTP::Post.new(url.path, initheader = {'Content-Type' =>'application/octet-stream'})
   req.basic_auth(REDMINE_TOKEN, 'nothing')
   req.body = File.read("images/#{filename}")
