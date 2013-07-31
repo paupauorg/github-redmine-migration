@@ -371,7 +371,7 @@ repos.each do |repo|
       end
 
       if !oi.labels.nil? && !oi.labels.empty?
-        i.description += "\nNotes: #{oi.labels.collect {|label| label.name }.to_s}"
+        i.description += "\nLabels: #{oi.labels.collect {|label| label.name }.to_s}"
       end
       if !oi.user.nil?
         login = oi.user.login
@@ -509,7 +509,7 @@ repos.each do |repo|
 
 
       if !ci.labels.nil? && !ci.labels.empty?
-        i.description += "\nNotes: #{ci.labels.collect {|label| label.name }.to_s}"
+        i.description += "\nLabels: #{ci.labels.collect {|label| label.name }.to_s}"
       end
       if !ci.user.nil?
         login = ci.user.login
