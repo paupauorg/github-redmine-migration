@@ -62,7 +62,7 @@ def download_image(filename)
   File.open("images/#{local_file}", 'wb') do |file|
     file.write open(filename).read
   end
-  rescue OpenURI::HTTPError
+  rescue OpenURI::HTTPError, SocketError
     local_file = nil
   end
   local_file
