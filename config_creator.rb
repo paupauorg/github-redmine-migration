@@ -18,7 +18,7 @@ github = Github.new do |config|
   config.endpoint    = 'https://api.github.com'
   config.site        = 'https://api.github.com'
   config.oauth_token = GITHUB_TOKEN
-  config.adapter     = :net_http
+  #config.adapter     = :net_http
   config.ssl         = {:verify => false}
   config.auto_pagination    = true
 end
