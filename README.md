@@ -6,8 +6,10 @@ Github-to-Redmine import script utility
 Ruby 1.9.3 or higher, rails 3.2.12 or higher, github_api gem and [pandoc 1.11.1](http://johnmacfarlane.net/pandoc/index.html). To install the gems run
 ````
 gem install rails -v '3.2.14'
-gem install github_api
+gem install github_api -v '0.11.3'
 ````
+(Github_api 0.12 doesn't work correctly, I'm guessing there's an issue with autopaging).
+
 To install Pandoc, you can either follow instructions to install from source ( http://johnmacfarlane.net/pandoc/installing.html ) or use this [.deb package](http://archive.ubuntu.com/ubuntu/pool/universe/p/pandoc/pandoc_1.11.1-2build2_amd64.deb)
 
 Also, you have to enable Redmine Api by checking `Enable REST web service` in `Administration>Settings>Authentication` in Redmine.
